@@ -1,103 +1,102 @@
 // app/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
+import HeartAnimation from './components/HeartAnimation';
+import LoveNotes from './components/LoveNotes';
+import MemoriesGallery from './components/MemoriesGallery';
+import LoveLetter from './components/LoveLetter';
+import LoveCounter from './components/LoveCounter';
+import ApologySection from './components/ApologySection';
 
-import LoveNotes from "./components/LoveNotes";
-import MemoriesGallery from "./components/MemoriesGallery";
-import LoveLetter from "./components/LoveLetter";
-import HeartAnimation from "./components/HeartAnimation";
-import LoveCounter from "./components/LoveCounter";
-
-type SectionType = "home" | "letter" | "memories" | "notes";
+type SectionType = 'home' | 'letter' | 'memories' | 'notes' | 'apology';
 
 export default function Home() {
-  const [currentSection, setCurrentSection] = useState<SectionType>("home");
+  const [currentSection, setCurrentSection] = useState<SectionType>('home');
   const [showFlowers, setShowFlowers] = useState<boolean>(false);
-
+  
   // Trigger flower animation
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowFlowers(true);
     }, 1000);
-
+    
     return () => clearTimeout(timer);
   }, []);
-
+  
   return (
     <div className="container">
       {/* Background elements */}
       <div className="background-hearts">
         <HeartAnimation count={15} />
       </div>
-
+      
       {showFlowers && (
         <div className="flower-animation">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className={`flower flower-${i}`}>
-              🌸
-            </div>
+            <div key={i} className={`flower flower-${i}`}>🌸</div>
           ))}
         </div>
       )}
-
+      
       {/* Header with navigation */}
       <header className="header">
         <div className="header-content">
-          <h1 className="title">
-            For My Beautiful <span className="highlight">Amna</span>
-          </h1>
-          <p className="subtitle">Every moment with you is a treasure</p>
-
+          <h1 className="title">For My Beautiful <span className="highlight">Amna</span></h1>
+          <p className="subtitle">From Lateef, with all my love and regret</p>
+          
           <nav className="nav">
-            <button
-              className={`nav-btn ${currentSection === "home" ? "active" : ""}`}
-              onClick={() => setCurrentSection("home")}
+            <button 
+              className={`nav-btn ${currentSection === 'home' ? 'active' : ''}`}
+              onClick={() => setCurrentSection('home')}
             >
               Home
             </button>
-            <button
-              className={`nav-btn ${currentSection === "letter" ? "active" : ""}`}
-              onClick={() => setCurrentSection("letter")}
+            <button 
+              className={`nav-btn ${currentSection === 'letter' ? 'active' : ''}`}
+              onClick={() => setCurrentSection('letter')}
             >
               Love Letter
             </button>
-            <button
-              className={`nav-btn ${currentSection === "memories" ? "active" : ""}`}
-              onClick={() => setCurrentSection("memories")}
+            <button 
+              className={`nav-btn ${currentSection === 'memories' ? 'active' : ''}`}
+              onClick={() => setCurrentSection('memories')}
             >
               Memories
             </button>
-            <button
-              className={`nav-btn ${currentSection === "notes" ? "active" : ""}`}
-              onClick={() => setCurrentSection("notes")}
+            <button 
+              className={`nav-btn ${currentSection === 'notes' ? 'active' : ''}`}
+              onClick={() => setCurrentSection('notes')}
             >
               Love Notes
+            </button>
+            <button 
+              className={`nav-btn ${currentSection === 'apology' ? 'active' : ''}`}
+              onClick={() => setCurrentSection('apology')}
+            >
+              My Apology
             </button>
           </nav>
         </div>
       </header>
-
+      
       <main className="main-content">
         {/* Home Section */}
-        {currentSection === "home" && (
+        {currentSection === 'home' && (
           <section className="home-section">
             <div className="welcome-card">
               <div className="heart-icon">❤️</div>
               <h2>Welcome to Your Special Place, Amna</h2>
               <p className="welcome-text">
-                This website is a small token of my endless love for you. Every
-                line of code, every animation, and every word is dedicated to
-                you.
+                This website is my way of showing you how deeply I care. 
+                Every line of code, every animation, and every word comes from my heart.
               </p>
               <div className="personal-message">
                 <p>You are the most beautiful person I know, inside and out.</p>
-                <p>
-                  Your smile lights up my world, and your heart makes it a
-                  better place.
-                </p>
+                <p>Your smile lights up my world, and your heart makes it a better place.</p>
+                <p className="signature">- Lateef</p>
               </div>
-
+              
               <div className="qualities">
                 <h3>What Makes You Amazing</h3>
                 <div className="qualities-grid">
@@ -124,31 +123,40 @@ export default function Home() {
                 </div>
               </div>
             </div>
-
+            
             <LoveCounter />
           </section>
         )}
-
+        
         {/* Love Letter Section */}
-        {currentSection === "letter" && <LoveLetter />}
-
+        {currentSection === 'letter' && (
+          <LoveLetter />
+        )}
+        
         {/* Memories Section */}
-        {currentSection === "memories" && <MemoriesGallery />}
-
+        {currentSection === 'memories' && (
+          <MemoriesGallery />
+        )}
+        
         {/* Love Notes Section */}
-        {currentSection === "notes" && <LoveNotes />}
+        {currentSection === 'notes' && (
+          <LoveNotes />
+        )}
+        
+        {/* Apology Section */}
+        {currentSection === 'apology' && (
+          <ApologySection />
+        )}
       </main>
-
+      
       {/* Footer with personal message */}
       <footer className="footer">
-        <p>
-          Made with <span className="heart-beat">❤️</span> for Amna
-        </p>
-        <p className="footer-note">You are loved more than words can express</p>
+        <p>Made with <span className="heart-beat">❤️</span> by Lateef for Amna</p>
+        <p className="footer-note">You are loved and cherished more than words can express</p>
       </footer>
-
+      
       {/* Floating love button */}
-      <button
+      <button 
         className="floating-love-btn"
         onClick={() => {
           const messages = [
@@ -157,9 +165,11 @@ export default function Home() {
             "My heart is yours",
             "Thinking of you always",
             "You make me so happy",
+            "I'm sorry for everything",
+            "You deserve the world",
+            "I cherish you, Amna"
           ];
-          const randomMsg =
-            messages[Math.floor(Math.random() * messages.length)];
+          const randomMsg = messages[Math.floor(Math.random() * messages.length)];
           alert(randomMsg);
         }}
       >

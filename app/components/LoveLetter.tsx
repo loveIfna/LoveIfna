@@ -1,4 +1,4 @@
-// components/LoveLetter.tsx
+// app/components/LoveLetter.tsx
 "use client";
 
 export default function LoveLetter() {
@@ -6,14 +6,14 @@ export default function LoveLetter() {
     <section className="letter-section">
       <div className="section-header">
         <h2>My Dearest Amna</h2>
-        <p className="section-subtitle">A letter from my heart to yours</p>
+        <p className="section-subtitle">A letter from Lateef's heart to yours</p>
       </div>
       
       <div className="letter-container">
         <div className="letter-paper">
           <div className="letter-header">
             <div className="letter-wax-seal">💌</div>
-            <div className="letter-date">Today and Always</div>
+            <div className="letter-date">From Lateef, with love</div>
           </div>
           
           <div className="letter-content">
@@ -53,7 +53,7 @@ export default function LoveLetter() {
             
             <div className="letter-signature">
               <div className="signature-line"></div>
-              <p className="signature-name">The one who loves you endlessly</p>
+              <p className="signature-name">Lateef</p>
             </div>
           </div>
         </div>
