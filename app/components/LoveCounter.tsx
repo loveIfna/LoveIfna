@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 
 export default function LoveCounter() {
   // Set your anniversary date here - change to your actual date
-  const anniversaryDate = new Date('2023-01-01'); // Change this to your date
+  const anniversaryDate = new Date('2021-11-13'); // Change this to your date
   const [daysTogether, setDaysTogether] = useState<number>(0);
   const [smilesCaused, setSmilesCaused] = useState<number>(0);
   const [heartsBeaten, setHeartsBeaten] = useState<number>(0);
