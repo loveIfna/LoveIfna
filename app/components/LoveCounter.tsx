@@ -17,11 +17,11 @@ export default function LoveCounter() {
     
     const smileInterval = setInterval(() => {
       setSmilesCaused(prev => prev + 1);
-    }, 3000);
+    }, 2000);
     
     const heartInterval = setInterval(() => {
       setHeartsBeaten(prev => prev + 1);
-    }, 500);
+    }, 1000);
     
     return () => {
       clearInterval(smileInterval);
@@ -32,11 +32,17 @@ export default function LoveCounter() {
   return (
     <div className="love-counter">
       <h3>Our Love in Numbers</h3>
-      <div className="counter-grid">
-        <div className="counter-item">
+      
+      {/* First box - Full width on mobile */}
+      <div className="counter-grid-main">
+        <div className="counter-item-main">
           <div className="counter-number">{daysTogether}</div>
-          <div className="counter-label">Days I've been lucky to know you</div>
+          <div className="counter-label">Days We have been together</div>
         </div>
+      </div>
+      
+      {/* Two boxes below - Side by side on mobile */}
+      <div className="counter-grid-two">
         <div className="counter-item">
           <div className="counter-number">{smilesCaused}</div>
           <div className="counter-label">Smiles you've caused (and counting!)</div>
@@ -46,7 +52,8 @@ export default function LoveCounter() {
           <div className="counter-label">Heartbeats just for you</div>
         </div>
       </div>
-      <p className="counter-note">Every moment with you is precious to me</p>
+      
+      <p className="counter-note">2021-11-13 2:38AM</p>
     </div>
   );
 }

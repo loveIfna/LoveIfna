@@ -1256,7 +1256,7 @@ body.modal-open .floating-love-btn {
 
 .footer p { color: var(--text-muted); font-size: 0.8rem; margin: 0; line-height: 1.4; }
 .footer-note { font-family: var(--font-serif); font-style: italic; color: var(--accent-gold-dark); font-size: 0.95rem; }
-.heart-beat { display: inline-block; color: var(--accent-rose-dark); animation: heartbeat 1.5s infinite; }
+.heart-beat { display: inline-block; color: var(--accent-rose-dark); animation: heartbeat 2s infinite; }
 
 @keyframes heartbeat {
   0%, 100% { transform: scale(1); }
@@ -2541,5 +2541,116 @@ body.modal-open .floating-love-btn {
   .photo-wrapper .decrypting-placeholder {
     height: 150px !important;
     font-size: 0.75rem !important;
+  }
+}
+
+
+/* Love Counter - Mobile Optimized */
+
+/* Main full-width box */
+.counter-grid-main {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.counter-item-main {
+  padding: 1.8rem 1rem;
+  background: var(--bg-card-solid);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  transition: transform 0.25s ease;
+}
+
+.counter-item-main:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-gold);
+}
+
+.counter-item-main .counter-number {
+  font-family: var(--font-serif);
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: var(--accent-rose-dark);
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.counter-item-main .counter-label {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Two boxes side by side */
+.counter-grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.counter-item {
+  padding: 1.5rem 1rem;
+  background: var(--bg-card-solid);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  transition: transform 0.25s ease;
+}
+
+.counter-item:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-gold);
+}
+
+.counter-item .counter-number {
+  font-family: var(--font-serif);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--accent-rose-dark);
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.counter-item .counter-label {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Remove old counter-grid */
+.counter-grid {
+  display: none;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .counter-item-main .counter-number {
+    font-size: 3rem;
+  }
+  
+  .counter-item-main .counter-label {
+    font-size: 0.85rem;
+  }
+  
+  .counter-item .counter-number {
+    font-size: 1.8rem;
+  }
+  
+  .counter-item .counter-label {
+    font-size: 0.6rem;
+  }
+  
+  .counter-grid-two {
+    gap: 0.6rem;
   }
 }

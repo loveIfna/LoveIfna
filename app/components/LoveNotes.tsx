@@ -111,8 +111,7 @@ export default function LoveNotes() {
   return (
     <section className="notes-section">
       <div className="section-header">
-        <span className="title-badge">💕 From the Heart</span>
-        <h2>Love Notes</h2>
+        <h2>🌹 Love Notes</h2>
         <p className="section-subtitle">Little reminders of my love for you</p>
       </div>
       
