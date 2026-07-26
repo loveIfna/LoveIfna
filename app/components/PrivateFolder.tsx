@@ -1,21 +1,21 @@
 // app/components/PrivateFolder.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
-import { 
-  getPrivateLetters, 
-  createPrivateLetter, 
-  updatePrivateLetter, 
-  deletePrivateLetter,
-  getPrivatePhotos,
-  createPrivatePhoto,
-  updatePrivatePhoto,
-  deletePrivatePhoto,
+import { useState, useEffect, useRef } from 'react';
+import {
+  getEncryptedPrivateLetters,
+  createEncryptedPrivateLetter,
+  updateEncryptedPrivateLetter,
+  deleteEncryptedPrivateLetter,
+  getEncryptedPrivatePhotos,
+  createEncryptedPrivatePhoto,
+  updateEncryptedPrivatePhoto,
+  deleteEncryptedPrivatePhoto,
   likePrivatePhoto,
-  uploadFile,
-  getFileUrl,
-  deleteFile
+  uploadEncryptedFile,
+  downloadEncryptedFile,
 } from '../components/lib/database';
+import { encryptionService } from '../components/lib/encryption';
 
 export interface PrivateLetter {
   $id: string;
@@ -32,7 +32,7 @@ export interface PrivatePhoto {
   caption: string;
   author: 'Lateef' | 'Amna';
   date: string;
-  url: string;
+  url: string; // local blob: URL of the DECRYPTED image, not the raw storage URL
   likes: number;
   fileId?: string;
 }
@@ -49,6 +49,10 @@ export default function PrivateFolder() {
   const [letters, setLetters] = useState<PrivateLetter[]>([]);
   const [photos, setPhotos] = useState<PrivatePhoto[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Tracks every blob: URL we've created for decrypted photos so we can
+  // revoke them (avoid memory leaks) whenever we reload data or unmount.
+  const objectUrlsRef = useRef<string[]>([]);
 
   // Modals
   const [showWriteLetterModal, setShowWriteLetterModal] = useState(false);
@@ -70,25 +74,38 @@ export default function PrivateFolder() {
   const [photoCaption, setPhotoCaption] = useState('');
   const [photoAuthor, setPhotoAuthor] = useState<'Lateef' | 'Amna'>('Lateef');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoUrlInput, setPhotoUrlInput] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // No auto-unlock-on-reload: the encryption key only ever lives in memory
+  // (encryptionService), never persisted, so it cannot survive a page
+  // reload. Requiring the passcode again each time is a feature of a real
+  // zero-knowledge design, not a bug — if we skipped this step we'd have to
+  // store the key or password somewhere, which would break the "password
+  // is never stored" guarantee.
+
+  // Clean up any decrypted-photo blob URLs when the component unmounts.
   useEffect(() => {
-    const unlocked = sessionStorage.getItem('private_vault_unlocked');
-    if (unlocked === 'true') {
-      setIsAuthenticated(true);
-      loadVaultData();
-    }
+    return () => {
+      revokeAllObjectUrls();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const revokeAllObjectUrls = () => {
+    for (const url of objectUrlsRef.current) {
+      URL.revokeObjectURL(url);
+    }
+    objectUrlsRef.current = [];
+  };
 
   const loadVaultData = async () => {
     setLoading(true);
     try {
       const [lettersData, photosData] = await Promise.all([
-        getPrivateLetters(),
-        getPrivatePhotos()
+        getEncryptedPrivateLetters(),
+        getEncryptedPrivatePhotos(),
       ]);
-      
+
       const mappedLetters: PrivateLetter[] = (lettersData as any[]).map(doc => ({
         $id: doc.$id,
         title: doc.title || doc.name || 'Untitled Letter',
@@ -98,16 +115,38 @@ export default function PrivateFolder() {
         content: doc.content || doc.text || '',
       }));
 
-      const mappedPhotos: PrivatePhoto[] = (photosData as any[]).map(doc => ({
-        $id: doc.$id,
-        title: doc.title || doc.name || 'Memory Photo',
-        caption: doc.caption || '',
-        author: (doc.author === 'Amna' ? 'Amna' : 'Lateef') as 'Lateef' | 'Amna',
-        date: doc.date || new Date(doc.$createdAt).toISOString().split('T')[0],
-        url: doc.url || '',
-        likes: doc.likes || 0,
-        fileId: doc.fileId || '',
-      }));
+      // Photos: title/caption are already decrypted by getEncryptedPrivatePhotos.
+      // The image bytes themselves are still encrypted in storage, so we
+      // download + decrypt each one here and turn it into a local blob: URL
+      // for display. Old object URLs are revoked first to avoid leaking memory.
+      revokeAllObjectUrls();
+
+      const mappedPhotos: PrivatePhoto[] = await Promise.all(
+        (photosData as any[]).map(async (doc) => {
+          let displayUrl = '';
+          if (doc.fileId) {
+            try {
+              const result = await downloadEncryptedFile(doc.fileId);
+              const blob = new Blob([result.data], { type: result.mimeType || 'image/jpeg' });
+              displayUrl = URL.createObjectURL(blob);
+              objectUrlsRef.current.push(displayUrl);
+            } catch (decryptErr) {
+              console.error(`⚠️ Failed to decrypt photo ${doc.$id}:`, decryptErr);
+            }
+          }
+
+          return {
+            $id: doc.$id,
+            title: doc.title || doc.name || 'Memory Photo',
+            caption: doc.caption || '',
+            author: (doc.author === 'Amna' ? 'Amna' : 'Lateef') as 'Lateef' | 'Amna',
+            date: doc.date || new Date(doc.$createdAt).toISOString().split('T')[0],
+            url: displayUrl,
+            likes: doc.likes || 0,
+            fileId: doc.fileId || '',
+          };
+        })
+      );
 
       setLetters(mappedLetters);
       setPhotos(mappedPhotos);
@@ -118,7 +157,8 @@ export default function PrivateFolder() {
     }
   };
 
-  // PIN Verification
+  // PIN Verification — the passcode is checked server-side, then reused
+  // client-side (never sent anywhere else) to derive the AES encryption key.
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -134,12 +174,12 @@ export default function PrivateFolder() {
       const data = await response.json();
 
       if (data.valid) {
+        encryptionService.initialize(inputCode.trim());
         setIsAuthenticated(true);
-        sessionStorage.setItem('private_vault_unlocked', 'true');
         setInputCode('');
         await loadVaultData();
       } else {
-        setError(data.error || 'Incorrect PIN code. Access denied.');
+        setError(data.error || 'Incorrect passcode. Access denied.');
         triggerShake();
       }
     } catch (err) {
@@ -148,6 +188,17 @@ export default function PrivateFolder() {
     } finally {
       setVerifying(false);
     }
+  };
+
+  const handleLockVault = () => {
+    encryptionService.clearSensitiveData();
+    revokeAllObjectUrls();
+    setLetters([]);
+    setPhotos([]);
+    setIsAuthenticated(false);
+    setInputCode('');
+    setSelectedLetter(null);
+    setSelectedPhoto(null);
   };
 
   const triggerShake = () => {
@@ -185,14 +236,14 @@ export default function PrivateFolder() {
 
     try {
       if (editingLetter) {
-        await updatePrivateLetter(editingLetter.$id, {
+        await updateEncryptedPrivateLetter(editingLetter.$id, {
           title: letterTitle,
           author: letterAuthor,
           category: letterCategory,
           content: letterContent,
         });
       } else {
-        await createPrivateLetter({
+        await createEncryptedPrivateLetter({
           title: letterTitle,
           author: letterAuthor,
           category: letterCategory,
@@ -211,7 +262,7 @@ export default function PrivateFolder() {
   const handleDeleteLetter = async (letterId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
-      await deletePrivateLetter(letterId);
+      await deleteEncryptedPrivateLetter(letterId);
       if (selectedLetter?.$id === letterId) setSelectedLetter(null);
       setConfirmDeleteId(null);
       await loadVaultData();
@@ -227,7 +278,6 @@ export default function PrivateFolder() {
     setPhotoCaption('');
     setPhotoAuthor('Lateef');
     setPhotoFile(null);
-    setPhotoUrlInput('');
     setShowPostPhotoModal(true);
   };
 
@@ -237,7 +287,7 @@ export default function PrivateFolder() {
     setPhotoTitle(photo.title);
     setPhotoCaption(photo.caption);
     setPhotoAuthor(photo.author);
-    setPhotoUrlInput(photo.url);
+    setPhotoFile(null);
     setSelectedPhoto(null);
     setShowPostPhotoModal(true);
   };
@@ -248,37 +298,40 @@ export default function PrivateFolder() {
       alert('Please enter a photo title.');
       return;
     }
+    if (!editingPhoto && !photoFile) {
+      alert('Please choose an image file.');
+      return;
+    }
 
     setUploadingPhoto(true);
 
     try {
-      let finalUrl = photoUrlInput || (editingPhoto ? editingPhoto.url : '');
       let fileId = editingPhoto?.fileId || '';
 
+      // Only re-upload/re-encrypt the file if the user picked a new one.
       if (photoFile) {
-        const uploaded = await uploadFile(photoFile);
+        const uploaded = await uploadEncryptedFile(photoFile);
         fileId = uploaded.$id;
-        finalUrl = getFileUrl(uploaded.$id);
       }
 
       if (editingPhoto) {
-        await updatePrivatePhoto(editingPhoto.$id, {
+        await updateEncryptedPrivatePhoto(editingPhoto.$id, {
           title: photoTitle,
           caption: photoCaption,
           author: photoAuthor,
         });
       } else {
-        await createPrivatePhoto({
+        await createEncryptedPrivatePhoto({
           title: photoTitle,
           caption: photoCaption,
           author: photoAuthor,
-          fileId: fileId,
-          url: finalUrl,
+          fileId,
         });
       }
 
       setShowPostPhotoModal(false);
       setEditingPhoto(null);
+      setPhotoFile(null);
       await loadVaultData();
     } catch (error) {
       alert('Failed to save photo. Please try again.');
@@ -291,10 +344,7 @@ export default function PrivateFolder() {
     if (e) e.stopPropagation();
     try {
       const photo = photos.find(p => p.$id === photoId);
-      if (photo?.fileId) {
-        await deleteFile(photo.fileId);
-      }
-      await deletePrivatePhoto(photoId);
+      await deleteEncryptedPrivatePhoto(photoId, photo?.fileId);
       if (selectedPhoto?.$id === photoId) setSelectedPhoto(null);
       setConfirmDeleteId(null);
       await loadVaultData();
@@ -306,6 +356,9 @@ export default function PrivateFolder() {
   const handleLikePhoto = async (photoId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
+      // Likes aren't sensitive content, so this stays on the plain
+      // (non-encrypting) update path — no need to re-encrypt title/caption
+      // just to bump a number.
       await likePrivatePhoto(photoId);
       await loadVaultData();
     } catch (error) {
@@ -313,43 +366,44 @@ export default function PrivateFolder() {
     }
   };
 
- // ========== LOCK SCREEN ==========
-if (!isAuthenticated) {
-  return (
-    <div className="private-folder-lock">
-      <div className={`lock-box ${shake ? 'shake-animation' : ''}`}>
-        <div className="lock-shield-icon">🛡️</div>
-        <h2>Secured Private Vault</h2>
-        <p>Enter the passcode to view and manage our private letters and couple photos.</p>
+  // ========== LOCK SCREEN ==========
+  if (!isAuthenticated) {
+    return (
+      <div className="private-folder-lock">
+        <div className={`lock-box ${shake ? 'shake-animation' : ''}`}>
+          <div className="lock-shield-icon">🛡️</div>
+          <h2>Secured Private Vault</h2>
+          <p>Enter the passcode to view and manage our private letters and couple photos.</p>
 
-        <form onSubmit={handleCodeSubmit} className="code-form">
-          <div className="pin-display-group">
-            <input
-              type="password"
-              value={inputCode}
-              onChange={(e) => setInputCode(e.target.value)}
-              placeholder="Enter access code"
-              className="code-input-hidden"
-              disabled={verifying}
-              // REMOVED: maxLength={10}
-              autoFocus
-            />
+          <form onSubmit={handleCodeSubmit} className="code-form">
+            <div className="pin-display-group">
+              <input
+                type="password"
+                value={inputCode}
+                onChange={(e) => setInputCode(e.target.value)}
+                placeholder="Enter access code"
+                autoComplete="off"
+                name="vault-access-code"
+                className="code-input-hidden"
+                disabled={verifying}
+                autoFocus
+              />
+            </div>
+
+            {error && <div className="code-error">{error}</div>}
+
+            <button type="submit" className="code-btn" disabled={verifying}>
+              {verifying ? 'Unlocking Vault...' : 'Unlock Private Vault 🗝️'}
+            </button>
+          </form>
+
+          <div className="security-badge-footer">
+            <span>🔒 AES-256-GCM • Confidential Private Space</span>
           </div>
-
-          {error && <div className="code-error">{error}</div>}
-
-          <button type="submit" className="code-btn" disabled={verifying}>
-            {verifying ? 'Unlocking Vault...' : 'Unlock Private Vault 🗝️'}
-          </button>
-        </form>
-
-        <div className="security-badge-footer">
-          <span>🔒 Confidential Private Space</span>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   // ========== VAULT UI ==========
   return (
@@ -387,6 +441,10 @@ if (!isAuthenticated) {
               📷 Post Photo
             </button>
           )}
+
+          <button className="action-trigger-btn" onClick={handleLockVault} title="Lock Vault">
+            🔒 Lock
+          </button>
         </div>
       </div>
 
@@ -446,7 +504,7 @@ if (!isAuthenticated) {
                 {/* Card Footer with Actions */}
                 <div className="letter-card-footer">
                   <span className="letter-card-read">📖 Read More</span>
-                  
+
                   <div className="card-actions" onClick={(e) => e.stopPropagation()}>
                     <button
                       className="action-icon-btn edit"
@@ -573,8 +631,8 @@ if (!isAuthenticated) {
           }
         }}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <button 
-              className="modal-close-btn" 
+            <button
+              className="modal-close-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowWriteLetterModal(false);
@@ -657,8 +715,8 @@ if (!isAuthenticated) {
           }
         }}>
           <div className="modal-card letter-paper" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px' }}>
-            <button 
-              className="modal-close-btn" 
+            <button
+              className="modal-close-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedLetter(null);
@@ -717,8 +775,8 @@ if (!isAuthenticated) {
           }
         }}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <button 
-              className="modal-close-btn" 
+            <button
+              className="modal-close-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowPostPhotoModal(false);
@@ -729,7 +787,7 @@ if (!isAuthenticated) {
             </button>
             <div className="modal-header-icon">📸</div>
             <h3 className="modal-title">{editingPhoto ? 'Edit Photo Details' : 'Post Couple Photo'}</h3>
-            <p className="modal-subtitle">Share a private memory in our vault.</p>
+            <p className="modal-subtitle">Share a private memory in our vault. Images are encrypted before upload.</p>
 
             <form onSubmit={handleSavePhoto} className="modal-form">
               <div className="form-row">
@@ -770,16 +828,18 @@ if (!isAuthenticated) {
               </div>
 
               <div className="form-group">
-                <label style={{ marginBottom: '0.4rem', display: 'block' }}>Image File</label>
-                <div 
-                  className="file-dropzone" 
+                <label style={{ marginBottom: '0.4rem', display: 'block' }}>
+                  Image File {editingPhoto ? '(leave empty to keep current photo)' : ''}
+                </label>
+                <div
+                  className="file-dropzone"
                   onClick={() => document.getElementById('photo-upload-input')?.click()}
                 >
                   <div className="file-dropzone-icon">📁</div>
                   <p className="file-dropzone-text">
                     {photoFile ? photoFile.name : 'Click to choose image file'}
                   </p>
-                  <span className="file-dropzone-hint">Supports JPG, PNG, WEBP</span>
+                  <span className="file-dropzone-hint">Supports JPG, PNG, WEBP — encrypted on upload</span>
                   <input
                     id="photo-upload-input"
                     type="file"
@@ -788,21 +848,10 @@ if (!isAuthenticated) {
                     onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
                   />
                 </div>
-
-                <div className="form-group" style={{ marginTop: '0.8rem' }}>
-                  <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Or Image Web URL:</label>
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    value={photoUrlInput}
-                    onChange={(e) => setPhotoUrlInput(e.target.value)}
-                    className="form-input"
-                  />
-                </div>
               </div>
 
               <button type="submit" className="submit-btn" disabled={uploadingPhoto}>
-                {uploadingPhoto ? '⏳ Saving Photo...' : editingPhoto ? '💾 Save Changes' : '📸 Post Photo to Vault'}
+                {uploadingPhoto ? '⏳ Encrypting & Saving...' : editingPhoto ? '💾 Save Changes' : '📸 Post Photo to Vault'}
               </button>
             </form>
           </div>
@@ -813,8 +862,8 @@ if (!isAuthenticated) {
       {selectedPhoto && (
         <div className="modal-backdrop" onClick={() => setSelectedPhoto(null)}>
           <div className="modal-card lightbox-card" onClick={(e) => e.stopPropagation()}>
-            <button 
-              className="modal-close-btn" 
+            <button
+              className="modal-close-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedPhoto(null);

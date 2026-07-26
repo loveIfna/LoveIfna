@@ -629,6 +629,47 @@ export async function getEncryptedPrivateLetters() {
   }
 }
 
+export async function updateEncryptedPrivateLetter(id: string, data: Partial<{
+  title: string;
+  content: string;
+  author: string;
+  category: string;
+}>) {
+  try {
+    if (!DATABASE_ID || !COLLECTIONS.PRIVATE_LETTERS) throw new Error('Database not configured');
+
+    const updatePayload: Record<string, any> = {};
+
+    if (data.title !== undefined) {
+      const encryptedTitle = await encryptionService.encryptText(data.title);
+      updatePayload.title_encrypted = JSON.stringify(encryptedTitle);
+    }
+    if (data.content !== undefined) {
+      const encryptedContent = await encryptionService.encryptText(data.content);
+      updatePayload.content_encrypted = JSON.stringify(encryptedContent);
+    }
+    if (data.author !== undefined) updatePayload.author = data.author;
+    if (data.category !== undefined) updatePayload.category = data.category;
+
+    const doc = await databases.updateDocument(DATABASE_ID, COLLECTIONS.PRIVATE_LETTERS, id, updatePayload);
+    return doc;
+  } catch (error) {
+    console.error('❌ Error updating encrypted private letter:', error);
+    throw error;
+  }
+}
+
+export async function deleteEncryptedPrivateLetter(id: string) {
+  try {
+    if (!DATABASE_ID || !COLLECTIONS.PRIVATE_LETTERS) return false;
+    await databases.deleteDocument(DATABASE_ID, COLLECTIONS.PRIVATE_LETTERS, id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error deleting encrypted private letter:', error);
+    throw error;
+  }
+}
+
 // ==================== ENCRYPTED PRIVATE PHOTOS (Vault) ====================
 export async function createEncryptedPrivatePhoto(data: {
   title: string;
@@ -707,6 +748,69 @@ export async function getEncryptedPrivatePhotos() {
   }
 }
 
+export async function updateEncryptedPrivatePhoto(id: string, data: Partial<{
+  title: string;
+  caption: string;
+  author: string;
+  likes: number;
+}>) {
+  try {
+    if (!DATABASE_ID || !COLLECTIONS.PRIVATE_PHOTOS) throw new Error('Database not configured');
+
+    const updatePayload: Record<string, any> = {};
+
+    if (data.title !== undefined) {
+      const encryptedTitle = await encryptionService.encryptText(data.title);
+      updatePayload.title_encrypted = JSON.stringify(encryptedTitle);
+    }
+    if (data.caption !== undefined) {
+      const encryptedCaption = await encryptionService.encryptText(data.caption);
+      updatePayload.caption_encrypted = JSON.stringify(encryptedCaption);
+    }
+    if (data.author !== undefined) updatePayload.author = data.author;
+    if (data.likes !== undefined) updatePayload.likes = data.likes;
+
+    const doc = await databases.updateDocument(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS, id, updatePayload);
+    return doc;
+  } catch (error) {
+    console.error('❌ Error updating encrypted private photo:', error);
+    throw error;
+  }
+}
+
+export async function deleteEncryptedPrivatePhoto(id: string, fileId?: string) {
+  try {
+    if (!DATABASE_ID || !COLLECTIONS.PRIVATE_PHOTOS) return false;
+
+    // Best-effort cleanup of the encrypted file + its metadata record.
+    // Metadata doc ID always equals fileId (see uploadEncryptedFile), so we
+    // can delete it directly without a lookup.
+    if (fileId) {
+      try {
+        if (BUCKET_ID) await storage.deleteFile(BUCKET_ID, fileId);
+      } catch (e) {
+        console.error('⚠️ Failed to delete encrypted file from storage:', e);
+      }
+      try {
+        await databases.deleteDocument(DATABASE_ID, 'encrypted_metadata', fileId);
+      } catch (e) {
+        try {
+          // metadata may have landed in the fallback collection instead
+          await databases.deleteDocument(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS, fileId);
+        } catch (e2) {
+          // not fatal — orphaned metadata doc, not the user-facing photo doc
+        }
+      }
+    }
+
+    await databases.deleteDocument(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS, id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error deleting encrypted private photo:', error);
+    throw error;
+  }
+}
+
 // ==================== ENCRYPTED FILE UPLOAD ====================
 // NOTE: `EncryptedFile` (from encryption.ts) now stores encrypted, iv, authTag,
 // and salt as base64 STRINGS so the object is safely JSON-serializable and
@@ -754,12 +858,16 @@ export async function uploadEncryptedFile(file: File, metadata?: any) {
       encryption_version: 1,
     };
 
-    // Store metadata in database (you need to create an 'encrypted_metadata' collection)
+    // Store metadata using the SAME document ID as the uploaded file
+    // (uploaded.$id), not a fresh ID.unique(). This lets downloadEncryptedFile
+    // and deleteEncryptedPrivatePhoto look the metadata up directly by fileId
+    // via getDocument()/deleteDocument() instead of listing + scanning every
+    // document (you need an 'encrypted_metadata' collection created in Appwrite).
     try {
-      await databases.createDocument(DATABASE_ID, 'encrypted_metadata', ID.unique(), encryptedData);
+      await databases.createDocument(DATABASE_ID, 'encrypted_metadata', uploaded.$id, encryptedData);
     } catch (e) {
       console.log('Metadata collection may not exist. Storing in default collection.');
-      await databases.createDocument(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS, ID.unique(), {
+      await databases.createDocument(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS, uploaded.$id, {
         ...encryptedData,
         type: 'encrypted_file_metadata',
       });
