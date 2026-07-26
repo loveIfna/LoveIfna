@@ -122,7 +122,7 @@ export default function LoveLetter() {
   return (
     <section className="letter-section">
       <div className="section-header">
-        <span className="title-badge">💌 From the Heart</span>
+        <span className="title-badge">❤️‍🩹 From the Heart</span>
         <h2>Love Letters</h2>
         <p className="section-subtitle">A letter from my heart to yours</p>
         <button 

@@ -132,31 +132,24 @@ export default function PrivateFolder() {
         content: doc.content || doc.text || '',
       }));
 
-      // Revoke old object URLs and reset photo URLs
       revokeAllObjectUrls();
       setPhotoUrls({});
       setDecryptingPhotos({});
 
-      const mappedPhotos: PrivatePhoto[] = (photosData as any[]).map((doc) => {
-        // Check if photo already has a URL from previous load
-        const existingUrl = photoUrls[doc.fileId] || '';
-        
-        return {
-          $id: doc.$id,
-          title: doc.title || doc.name || 'Memory Photo',
-          caption: doc.caption || '',
-          author: (doc.author === 'Amna' ? 'Amna' : 'Lateef') as 'Lateef' | 'Amna',
-          date: doc.date || new Date(doc.$createdAt).toISOString().split('T')[0],
-          url: existingUrl,
-          likes: doc.likes || 0,
-          fileId: doc.fileId || '',
-        };
-      });
+      const mappedPhotos: PrivatePhoto[] = (photosData as any[]).map((doc) => ({
+        $id: doc.$id,
+        title: doc.title || doc.name || 'Memory Photo',
+        caption: doc.caption || '',
+        author: (doc.author === 'Amna' ? 'Amna' : 'Lateef') as 'Lateef' | 'Amna',
+        date: doc.date || new Date(doc.$createdAt).toISOString().split('T')[0],
+        url: '',
+        likes: doc.likes || 0,
+        fileId: doc.fileId || '',
+      }));
 
       setLetters(mappedLetters);
       setPhotos(mappedPhotos);
 
-      // Auto-decrypt photos if in photos tab
       if (activeTab === 'photos') {
         for (const photo of mappedPhotos) {
           if (photo.fileId && !photoUrls[photo.fileId]) {
@@ -173,7 +166,6 @@ export default function PrivateFolder() {
     }
   };
 
-  // Decrypt photos when switching to photos tab
   useEffect(() => {
     if (activeTab === 'photos' && isAuthenticated && photos.length > 0) {
       for (const photo of photos) {
@@ -184,7 +176,6 @@ export default function PrivateFolder() {
     }
   }, [activeTab, photos, photoUrls]);
 
-  // PIN Verification
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -432,50 +423,76 @@ export default function PrivateFolder() {
   // ========== VAULT UI ==========
   return (
     <>
-      <div className="private-folder-content" style={{ marginTop: '1.5rem' }}>
-        <div className="folder-top-bar">
+      <div className="private-folder-content" style={{ marginTop: '1rem' }}>
+        {/* Header Bar - Updated Layout */}
+        <div className="folder-top-bar" style={{ padding: '0.8rem 1rem' }}>
           <div className="folder-title-area">
-            <h2>🤭 Private Vault</h2>          </div>
+            <h2 style={{ fontSize: '1.3rem' }}>🤭 Private Vault</h2>
+          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-            <div className="folder-tabs">
-              <button
-                className={`tab-btn ${activeTab === 'letters' ? 'active' : ''}`}
-                onClick={() => setActiveTab('letters')}
+          {/* SPLIT LAYOUT: Left side (Tabs + Action) | Right side (Lock) */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            width: '100%',
+            gap: '0.5rem',
+            flexWrap: 'wrap'
+          }}>
+            {/* LEFT SIDE - Tabs + Write/Post Button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div className="folder-tabs" style={{ gap: '0.3rem', padding: '0.2rem' }}>
+                <button
+                  className={`tab-btn ${activeTab === 'letters' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('letters')}
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
+                >
+                  💌 {letters.length}
+                </button>
+                <button
+                  className={`tab-btn ${activeTab === 'photos' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('photos')}
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
+                >
+                  📸 {photos.length}
+                </button>
+              </div>
+
+              <button 
+                className="action-trigger-btn" 
+                onClick={activeTab === 'letters' ? openCreateLetterModal : openCreatePhotoModal}
+                style={{ 
+                  padding: '0.5rem 1.2rem', 
+                  fontSize: '0.85rem',
+                  minWidth: '100px',
+                  fontWeight: 600
+                }}
               >
-                💌 Letters ({letters.length})
-              </button>
-              <button
-                className={`tab-btn ${activeTab === 'photos' ? 'active' : ''}`}
-                onClick={() => setActiveTab('photos')}
-              >
-                📸 Photos ({photos.length})
+                {activeTab === 'letters' ? '✏️ Write' : '📷 Post Photo'}
               </button>
             </div>
 
-            {activeTab === 'letters' ? (
-              <button className="action-trigger-btn" onClick={openCreateLetterModal}>
-                ✏️ Write Letter
+            {/* RIGHT SIDE - Lock Button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button 
+                className="action-trigger-btn" 
+                onClick={handleLockVault} 
+                title="Lock Vault"
+                style={{ 
+                  padding: '0.5rem 1rem', 
+                  fontSize: '0.85rem',
+                  background: '#6E6562',
+                  minWidth: '80px'
+                }}
+              >
+                🔒 Lock
               </button>
-            ) : (
-              <button className="action-trigger-btn" onClick={openCreatePhotoModal}>
-                📷 Post Photo
-              </button>
-            )}
-
-            <button className="action-trigger-btn" onClick={handleLockVault} title="Lock Vault">
-              🔒 Lock
-            </button>
+            </div>
           </div>
         </div>
 
         {loading && (
-          <div className="skeleton-grid" style={{ marginTop: '1.5rem' }}>
-            <div className="skeleton-card">
-              <div className="skeleton-box skeleton-title" />
-              <div className="skeleton-box skeleton-text" />
-              <div className="skeleton-box skeleton-text-short" />
-            </div>
+          <div className="skeleton-grid" style={{ marginTop: '1rem' }}>
             <div className="skeleton-card">
               <div className="skeleton-box skeleton-title" />
               <div className="skeleton-box skeleton-text" />
@@ -491,12 +508,12 @@ export default function PrivateFolder() {
 
         {/* LETTERS SECTION */}
         {activeTab === 'letters' && !loading && (
-          <div className="letters-vault-grid">
+          <div className="letters-vault-grid" style={{ gap: '0.8rem' }}>
             {letters.length === 0 ? (
-              <div className="empty-state">
+              <div className="empty-state" style={{ padding: '2rem' }}>
                 <div className="empty-icon">📭</div>
-                <h4>No letters in vault yet</h4>
-                <p>Click "Write Letter" above to post your first private note.</p>
+                <h4>No letters yet</h4>
+                <p style={{ fontSize: '0.85rem' }}>Click ✏️ to write</p>
               </div>
             ) : (
               letters.map((letter) => (
@@ -504,46 +521,35 @@ export default function PrivateFolder() {
                   key={letter.$id}
                   className="letter-vault-card"
                   onClick={() => setSelectedLetter(letter)}
+                  style={{ padding: '1rem', gap: '0.5rem' }}
                 >
                   <div className="letter-card-header">
-                    <span className={`letter-card-author ${letter.author === 'Amna' ? 'amna' : 'lateef'}`}>
+                    <span className={`letter-card-author ${letter.author === 'Amna' ? 'amna' : 'lateef'}`} style={{ fontSize: '0.6rem' }}>
                       {letter.author === 'Amna' ? '🌸 Amna' : '💙 Lateef'}
                     </span>
-                    <span className="letter-card-date">{letter.date}</span>
+                    <span className="letter-card-date" style={{ fontSize: '0.6rem' }}>{letter.date}</span>
                   </div>
 
                   <div className="letter-card-body">
-                    <h3 className="letter-card-title">{letter.title}</h3>
+                    <h3 className="letter-card-title" style={{ fontSize: '1rem', marginBottom: '0.2rem' }}>{letter.title}</h3>
                     <div className="letter-card-category">
-                      <span className="category-tag">{letter.category}</span>
+                      <span className="category-tag" style={{ fontSize: '0.55rem' }}>{letter.category}</span>
                     </div>
-                    <p className="letter-card-preview">{letter.content}</p>
+                    <p className="letter-card-preview" style={{ fontSize: '0.8rem', WebkitLineClamp: 1 }}>{letter.content}</p>
                   </div>
 
-                  <div className="letter-card-footer">
-                    <span className="letter-card-read">📖 Read More</span>
+                  <div className="letter-card-footer" style={{ paddingTop: '0.4rem' }}>
+                    <span className="letter-card-read" style={{ fontSize: '0.65rem' }}>📖 Read</span>
                     <div className="card-actions" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="action-icon-btn edit"
-                        title="Edit Letter"
-                        onClick={(e) => openEditLetterModal(letter, e)}
-                      >
-                        ✏️
-                      </button>
+                      <button className="action-icon-btn edit" onClick={(e) => openEditLetterModal(letter, e)} style={{ width: '24px', height: '24px', fontSize: '0.65rem' }}>✏️</button>
                       {confirmDeleteId === letter.$id ? (
-                        <div className="confirm-delete-box">
+                        <div className="confirm-delete-box" style={{ fontSize: '0.6rem' }}>
                           <span>Delete?</span>
                           <button className="confirm-yes" onClick={(e) => handleDeleteLetter(letter.$id, e)}>Yes</button>
                           <button className="confirm-no" onClick={() => setConfirmDeleteId(null)}>No</button>
                         </div>
                       ) : (
-                        <button
-                          className="action-icon-btn delete"
-                          title="Delete Letter"
-                          onClick={() => setConfirmDeleteId(letter.$id)}
-                        >
-                          🗑️
-                        </button>
+                        <button className="action-icon-btn delete" onClick={() => setConfirmDeleteId(letter.$id)} style={{ width: '24px', height: '24px', fontSize: '0.65rem' }}>🗑️</button>
                       )}
                     </div>
                   </div>
@@ -553,14 +559,17 @@ export default function PrivateFolder() {
           </div>
         )}
 
-        {/* PHOTOS SECTION - Fixed */}
+        {/* PHOTOS SECTION - 4 per row on mobile */}
         {activeTab === 'photos' && !loading && (
-          <div className="photos-vault-grid">
+          <div className="photos-vault-grid" style={{ 
+            gap: '0.4rem', 
+            gridTemplateColumns: 'repeat(4, 1fr)'
+          }}>
             {photos.length === 0 ? (
-              <div className="empty-state">
+              <div className="empty-state" style={{ padding: '2rem', gridColumn: '1 / -1' }}>
                 <div className="empty-icon">❤️</div>
-                <h4>No photos in vault yet</h4>
-                <p>Click "Post Photo" above to upload.</p>
+                <h4>No photos yet</h4>
+                <p style={{ fontSize: '0.85rem' }}>Click 📷 to upload</p>
               </div>
             ) : (
               photos.map((photo) => {
@@ -576,68 +585,77 @@ export default function PrivateFolder() {
                         setSelectedPhoto({ ...photo, url: imageUrl });
                       }
                     }}
+                    style={{ borderRadius: '8px', overflow: 'hidden' }}
                   >
-                    <div className="photo-wrapper">
+                    <div className="photo-wrapper" style={{ paddingTop: '100%' }}>
                       {isDecrypting ? (
                         <div style={{ 
-                          height: '200px', 
+                          position: 'absolute', 
+                          inset: 0, 
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
                           background: '#f5f0ed',
                           color: 'var(--text-light)',
-                          fontSize: '0.9rem'
+                          fontSize: '0.55rem',
+                          flexDirection: 'column',
+                          gap: '0.1rem'
                         }}>
-                          <span>🔓 Decrypting...</span>
+                          <span>🔓</span>
+                          <span>Decrypt...</span>
                         </div>
                       ) : imageUrl ? (
                         <img
                           src={imageUrl}
                           alt={photo.title}
                           className="photo-img"
+                          loading="lazy"
+                          style={{ objectFit: 'cover' }}
                           onError={(e) => {
-                            console.error('Image failed to load:', imageUrl);
                             (e.target as HTMLImageElement).src =
                               'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23f4ece7"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" font-size="30"%3E📸%3C/text%3E%3C/svg%3E';
                           }}
                         />
                       ) : (
                         <div style={{ 
-                          height: '200px', 
+                          position: 'absolute', 
+                          inset: 0, 
                           display: 'flex', 
                           flexDirection: 'column',
                           alignItems: 'center', 
                           justifyContent: 'center',
                           background: '#f5f0ed',
                           color: 'var(--text-light)',
-                          fontSize: '0.9rem',
-                          gap: '0.5rem'
+                          fontSize: '0.55rem',
+                          gap: '0.1rem'
                         }}>
-                          <span>🔒 Encrypted</span>
-                          <span style={{ fontSize: '0.7rem' }}>Click to decrypt</span>
+                          <span>🔒</span>
+                          <span>Tap</span>
                         </div>
                       )}
                       <div className="photo-overlay">
-                        <span className="zoom-badge">🔍 View Full Photo</span>
+                        <span className="zoom-badge" style={{ fontSize: '0.5rem', padding: '0.1rem 0.3rem' }}>🔍</span>
                       </div>
-                      <div className="photo-author-badge">
+                      <div className="photo-author-badge" style={{ width: '18px', height: '18px', fontSize: '0.5rem', top: '0.15rem', right: '0.15rem' }}>
                         {photo.author === 'Amna' ? '🌸' : '💙'}
                       </div>
                     </div>
 
-                    <div className="photo-info">
-                      <div className="photo-header">
-                        <h4 className="photo-title">{photo.title}</h4>
-                        <div className="photo-actions" onClick={(e) => e.stopPropagation()}>
+                    <div className="photo-info" style={{ padding: '0.3rem', gap: '0.1rem' }}>
+                      <div className="photo-header" style={{ alignItems: 'center' }}>
+                        <h4 className="photo-title" style={{ fontSize: '0.55rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '45px' }}>
+                          {photo.title}
+                        </h4>
+                        <div className="photo-actions" onClick={(e) => e.stopPropagation()} style={{ gap: '0.1rem' }}>
                           <button
                             className="action-icon-btn edit"
-                            title="Edit Photo"
                             onClick={(e) => openEditPhotoModal(photo, e)}
+                            style={{ width: '16px', height: '16px', fontSize: '0.45rem' }}
                           >
                             ✏️
                           </button>
                           {confirmDeleteId === photo.$id ? (
-                            <div className="confirm-delete-box">
+                            <div className="confirm-delete-box" style={{ fontSize: '0.4rem' }}>
                               <span>Delete?</span>
                               <button className="confirm-yes" onClick={(e) => handleDeletePhoto(photo.$id, e)}>Yes</button>
                               <button className="confirm-no" onClick={() => setConfirmDeleteId(null)}>No</button>
@@ -645,8 +663,8 @@ export default function PrivateFolder() {
                           ) : (
                             <button
                               className="action-icon-btn delete"
-                              title="Delete Photo"
                               onClick={() => setConfirmDeleteId(photo.$id)}
+                              style={{ width: '16px', height: '16px', fontSize: '0.45rem' }}
                             >
                               🗑️
                             </button>
@@ -654,13 +672,14 @@ export default function PrivateFolder() {
                         </div>
                       </div>
 
-                      <p className="photo-caption">{photo.caption}</p>
+                      <p className="photo-caption" style={{ fontSize: '0.5rem', display: 'none' }}>{photo.caption}</p>
 
-                      <div className="photo-meta">
-                        <span className="photo-meta-author">By {photo.author} • {photo.date}</span>
+                      <div className="photo-meta" style={{ paddingTop: '0.1rem', fontSize: '0.45rem', flexWrap: 'wrap', gap: '0.1rem' }}>
+                        <span className="photo-meta-author" style={{ fontSize: '0.4rem' }}>{photo.date}</span>
                         <button
                           className="like-btn"
                           onClick={(e) => handleLikePhoto(photo.$id, e)}
+                          style={{ fontSize: '0.5rem', padding: '0.05rem 0.15rem' }}
                         >
                           <span className="like-heart">❤️</span> {photo.likes}
                         </button>
@@ -674,8 +693,7 @@ export default function PrivateFolder() {
         )}
       </div>
 
-      {/* MODALS - Keep the same as before */}
-      {/* CREATE / EDIT LETTER MODAL */}
+      {/* MODALS - Keep the same */}
       {showWriteLetterModal && (
         <div className="modal-backdrop" onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -684,41 +702,26 @@ export default function PrivateFolder() {
           }
         }}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="modal-close-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowWriteLetterModal(false);
-                setEditingLetter(null);
-              }}
-            >
-              ✕
-            </button>
+            <button className="modal-close-btn" onClick={(e) => {
+              e.stopPropagation();
+              setShowWriteLetterModal(false);
+              setEditingLetter(null);
+            }}>✕</button>
             <div className="modal-header-icon">✍️</div>
             <h3 className="modal-title">{editingLetter ? 'Edit Private Letter' : 'Write a Private Letter'}</h3>
             <p className="modal-subtitle">Save a private letter in our secure vault.</p>
-
             <form onSubmit={handleSaveLetter} className="modal-form">
               <div className="form-row">
                 <div className="form-group">
                   <label>Author</label>
-                  <select
-                    value={letterAuthor}
-                    onChange={(e) => setLetterAuthor(e.target.value as 'Lateef' | 'Amna')}
-                    className="form-select"
-                  >
+                  <select value={letterAuthor} onChange={(e) => setLetterAuthor(e.target.value as 'Lateef' | 'Amna')} className="form-select">
                     <option value="Lateef">💙 Lateef</option>
                     <option value="Amna">🌸 Amna</option>
                   </select>
                 </div>
-
                 <div className="form-group">
                   <label>Category</label>
-                  <select
-                    value={letterCategory}
-                    onChange={(e) => setLetterCategory(e.target.value)}
-                    className="form-select"
-                  >
+                  <select value={letterCategory} onChange={(e) => setLetterCategory(e.target.value)} className="form-select">
                     <option value="Love Note">💕 Love Note</option>
                     <option value="Promise">🤝 Promise</option>
                     <option value="Memory">✨ Memory</option>
@@ -727,57 +730,24 @@ export default function PrivateFolder() {
                   </select>
                 </div>
               </div>
-
               <div className="form-group">
                 <label>Letter Title</label>
-                <input
-                  type="text"
-                  placeholder="e.g., To My Sunshine..."
-                  value={letterTitle}
-                  onChange={(e) => setLetterTitle(e.target.value)}
-                  className="form-input"
-                  required
-                />
+                <input type="text" placeholder="e.g., To My Sunshine..." value={letterTitle} onChange={(e) => setLetterTitle(e.target.value)} className="form-input" required />
               </div>
-
               <div className="form-group">
                 <label>Letter Content</label>
-                <textarea
-                  rows={6}
-                  placeholder="Write your private thoughts..."
-                  value={letterContent}
-                  onChange={(e) => setLetterContent(e.target.value)}
-                  className="form-textarea"
-                  required
-                />
+                <textarea rows={6} placeholder="Write your private thoughts..." value={letterContent} onChange={(e) => setLetterContent(e.target.value)} className="form-textarea" required />
               </div>
-
-              <button type="submit" className="submit-btn">
-                {editingLetter ? '💾 Save Changes' : '💌 Post Letter to Vault'}
-              </button>
+              <button type="submit" className="submit-btn">{editingLetter ? '💾 Save Changes' : '💌 Post Letter to Vault'}</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* READ LETTER MODAL */}
       {selectedLetter && (
-        <div className="modal-backdrop" onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setSelectedLetter(null);
-          }
-        }}>
+        <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setSelectedLetter(null); }}>
           <div className="modal-card letter-paper" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px' }}>
-            <button
-              className="modal-close-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedLetter(null);
-              }}
-            >
-              ✕
-            </button>
-
+            <button className="modal-close-btn" onClick={() => setSelectedLetter(null)}>✕</button>
             <div className="letter-read-header">
               <div className="letter-read-author">
                 <span className={`letter-card-author ${selectedLetter.author === 'Amna' ? 'amna' : 'lateef'}`}>
@@ -786,31 +756,14 @@ export default function PrivateFolder() {
                 <span className="letter-read-date">{selectedLetter.date} • {selectedLetter.category}</span>
               </div>
               <div className="letter-read-actions" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className="action-icon-btn edit"
-                  title="Edit Letter"
-                  onClick={() => openEditLetterModal(selectedLetter)}
-                >
-                  ✏️
-                </button>
-                <button
-                  className="action-icon-btn delete"
-                  title="Delete Letter"
-                  onClick={() => handleDeleteLetter(selectedLetter.$id)}
-                >
-                  🗑️
-                </button>
+                <button className="action-icon-btn edit" onClick={() => openEditLetterModal(selectedLetter)}>✏️</button>
+                <button className="action-icon-btn delete" onClick={() => handleDeleteLetter(selectedLetter.$id)}>🗑️</button>
               </div>
             </div>
-
             <h2 className="letter-read-title">{selectedLetter.title}</h2>
-
             <div className="letter-read-content">
-              {selectedLetter.content.split('\n').map((paragraph, idx) => (
-                <p key={idx}>{paragraph}</p>
-              ))}
+              {selectedLetter.content.split('\n').map((paragraph, idx) => <p key={idx}>{paragraph}</p>)}
             </div>
-
             <div className="letter-read-signature">
               <div className="signature-line"></div>
               <p className="signature-name">- {selectedLetter.author}</p>
@@ -819,90 +772,40 @@ export default function PrivateFolder() {
         </div>
       )}
 
-      {/* CREATE / EDIT PHOTO MODAL */}
       {showPostPhotoModal && (
-        <div className="modal-backdrop" onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setShowPostPhotoModal(false);
-            setEditingPhoto(null);
-          }
-        }}>
+        <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) { setShowPostPhotoModal(false); setEditingPhoto(null); } }}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="modal-close-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowPostPhotoModal(false);
-                setEditingPhoto(null);
-              }}
-            >
-              ✕
-            </button>
+            <button className="modal-close-btn" onClick={(e) => { e.stopPropagation(); setShowPostPhotoModal(false); setEditingPhoto(null); }}>✕</button>
             <div className="modal-header-icon">📸</div>
             <h3 className="modal-title">{editingPhoto ? 'Edit Photo Details' : 'Post Couple Photo'}</h3>
             <p className="modal-subtitle">Share a private memory in our vault. Images are encrypted before upload.</p>
-
             <form onSubmit={handleSavePhoto} className="modal-form">
               <div className="form-row">
                 <div className="form-group">
                   <label>Posted By</label>
-                  <select
-                    value={photoAuthor}
-                    onChange={(e) => setPhotoAuthor(e.target.value as 'Lateef' | 'Amna')}
-                    className="form-select"
-                  >
+                  <select value={photoAuthor} onChange={(e) => setPhotoAuthor(e.target.value as 'Lateef' | 'Amna')} className="form-select">
                     <option value="Lateef">💙 Lateef</option>
                     <option value="Amna">🌸 Amna</option>
                   </select>
                 </div>
-
                 <div className="form-group">
                   <label>Photo Title</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Beach Sunset"
-                    value={photoTitle}
-                    onChange={(e) => setPhotoTitle(e.target.value)}
-                    className="form-input"
-                    required
-                  />
+                  <input type="text" placeholder="e.g., Beach Sunset" value={photoTitle} onChange={(e) => setPhotoTitle(e.target.value)} className="form-input" required />
                 </div>
               </div>
-
               <div className="form-group">
                 <label>Caption</label>
-                <input
-                  type="text"
-                  placeholder="Describe this memory..."
-                  value={photoCaption}
-                  onChange={(e) => setPhotoCaption(e.target.value)}
-                  className="form-input"
-                />
+                <input type="text" placeholder="Describe this memory..." value={photoCaption} onChange={(e) => setPhotoCaption(e.target.value)} className="form-input" />
               </div>
-
               <div className="form-group">
-                <label style={{ marginBottom: '0.4rem', display: 'block' }}>
-                  Image File {editingPhoto ? '(leave empty to keep current photo)' : ''}
-                </label>
-                <div
-                  className="file-dropzone"
-                  onClick={() => document.getElementById('photo-upload-input')?.click()}
-                >
+                <label style={{ marginBottom: '0.4rem', display: 'block' }}>Image File {editingPhoto ? '(leave empty to keep current photo)' : ''}</label>
+                <div className="file-dropzone" onClick={() => document.getElementById('photo-upload-input')?.click()}>
                   <div className="file-dropzone-icon">📁</div>
-                  <p className="file-dropzone-text">
-                    {photoFile ? photoFile.name : 'Click to choose image file'}
-                  </p>
+                  <p className="file-dropzone-text">{photoFile ? photoFile.name : 'Click to choose image file'}</p>
                   <span className="file-dropzone-hint">Supports JPG, PNG, WEBP — encrypted on upload</span>
-                  <input
-                    id="photo-upload-input"
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
-                  />
+                  <input id="photo-upload-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} />
                 </div>
               </div>
-
               <button type="submit" className="submit-btn" disabled={uploadingPhoto}>
                 {uploadingPhoto ? '⏳ Encrypting & Saving...' : editingPhoto ? '💾 Save Changes' : '📸 Post Photo to Vault'}
               </button>
@@ -911,48 +814,18 @@ export default function PrivateFolder() {
         </div>
       )}
 
-      {/* LIGHTBOX PHOTO MODAL */}
       {selectedPhoto && (
         <div className="modal-backdrop" onClick={() => setSelectedPhoto(null)}>
           <div className="modal-card lightbox-card" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="modal-close-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedPhoto(null);
-              }}
-            >
-              ✕
-            </button>
-
-            <img
-              src={selectedPhoto.url}
-              alt={selectedPhoto.title}
-              className="lightbox-image"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23f4ece7"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" font-size="30"%3E📸%3C/text%3E%3C/svg%3E';
-              }}
-            />
-
+            <button className="modal-close-btn" onClick={() => setSelectedPhoto(null)}>✕</button>
+            <img src={selectedPhoto.url} alt={selectedPhoto.title} className="lightbox-image" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23f4ece7"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" font-size="30"%3E📸%3C/text%3E%3C/svg%3E'; }} />
             <div className="lightbox-details">
               <h3>{selectedPhoto.title}</h3>
               <p className="lightbox-caption">{selectedPhoto.caption}</p>
               <p className="lightbox-meta">Posted by {selectedPhoto.author} on {selectedPhoto.date}</p>
-
               <div className="lightbox-actions">
-                <button
-                  className="action-icon-btn edit"
-                  onClick={() => openEditPhotoModal(selectedPhoto)}
-                >
-                  ✏️ Edit
-                </button>
-                <button
-                  className="action-icon-btn delete"
-                  onClick={() => handleDeletePhoto(selectedPhoto.$id)}
-                >
-                  🗑️ Delete
-                </button>
+                <button className="action-icon-btn edit" onClick={() => openEditPhotoModal(selectedPhoto)}>✏️ Edit</button>
+                <button className="action-icon-btn delete" onClick={() => handleDeletePhoto(selectedPhoto.$id)}>🗑️ Delete</button>
               </div>
             </div>
           </div>

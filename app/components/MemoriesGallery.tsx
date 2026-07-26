@@ -180,7 +180,7 @@ export default function MemoriesGallery() {
     <section className="memories-section">
       <div className="section-header">
         <h2>Precious Memories</h2>
-        <p className="section-subtitle">Moments that make my heart full</p>
+        <p className="section-subtitle">Tumhare saath guzara hua waqt</p>
         <button className="action-trigger-btn" onClick={handleAddClick} style={{ marginTop: '1rem' }}>
           ✨ Add Memory
         </button>

@@ -230,17 +230,17 @@ export default function ApologySection() {
   return (
     <section className="apology-section">
       <div className="section-header">
-        <h2>Mujhe Maaf Karna</h2>
+        <h2>Tum Sirf Meri Ho</h2>
         <p className="section-subtitle">Mere dil se likhi gyi baat sirf or sirf Meri Jaan ke liye</p>
       </div>
-      
+      &nbsp;
       <div className="apology-container">
         {/* Letter Card */}
         <div className="apology-letter">
           <div className="apology-header">
             <div className="apology-date">Aaj iss bhaari dil se likhra hu</div>
           </div>
-
+&nbsp;
           <div className="apology-content">
             <p className="apology-greeting">Meri Jaan 🎀,</p>
             
@@ -249,25 +249,25 @@ export default function ApologySection() {
               kabhi kabhi me tumhe bohot zyada gussa dila deta hu.. or me jaata hu tumhe isse bohot taqleef hoti h...
               par me aisa nhi hu mene kabhi bhi tumhe sachme hurt karna nhi chaha... 
             </p>
-            
+            &nbsp;
             <p>
               Tum bohot keemti ho mere liye... Tumhe me kabhi compare nhi kar sakta kisi bhi ladki se..
               Tum meri jaan ho Amna.. Tumhare alawa mera koi nhi.. na duniya me na akhirat me..
             </p>
-            
+            &nbsp;
             <div className="apology-highlight">
               "Me galat tha, mene tumhe taqleef di.. uss galti ke liye SORRY JAAN"
             </div>
-
+            &nbsp;
             <p>
               Mujhe pata h tum mujhse bohot zyada pyaar karti ho.. or kabhi bhi me tumse durr rahu to yeh letter padh lena 
               toh tum mujhe feel kar paaogi.. chahe kitne bhi gusse me kuch bhi kaha rahu.. 
             </p>
-
+            &nbsp;
             <p>
               hum hamesha ek saath rahenge tumne kaha hona ke tumhe hamesha mere saath rehna h.. toh tumhara wada hum milke nibhayege..🥰
             </p>
-
+&nbsp;
             <p className="apology-closing">Tumhari Jaan,</p>
             
             <div className="apology-signature">

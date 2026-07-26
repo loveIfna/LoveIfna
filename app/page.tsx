@@ -342,7 +342,7 @@ const handleLogout = async () => {
               </p>
 
               <div className="personal-message">
-                <p>"Tumse khoobsurat cheez mene kabhi nhi dekhi, tumhare gusse se bhi mujhe pyaar h.. or hamesha hum saath rahenge..."</p>
+                <p>"Tumse khoobsurat cheez mene kabhi nhi dekhi, tumhare gusse se bhi mujhe pyaar h.. or hamesha pyaar rahega..."</p>
                 <p className="signature">- Lateef</p>
               </div>
 
@@ -367,7 +367,7 @@ const handleLogout = async () => {
                   </div>
                   <div className="quality-card">
                     <div className="quality-icon">💎</div>
-                    <h4>Meri Raajkumari </h4>
+                    <h4>Meri Papu Jaan</h4>
                     <p>Tumhe me alfazo me bayaan nhi kar sakta, tum meri zidd ho jo me pa kar rahunga</p>
                   </div>
                 </div>
