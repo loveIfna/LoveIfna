@@ -16,15 +16,6 @@ interface PromiseItem {
   completed: boolean;
 }
 
-const DEFAULT_PROMISES: PromiseItem[] = [
-  { text: "I will never raise my hand to you again", completed: true },
-  { text: "I will never use hurtful words", completed: true },
-  { text: "I will listen to you with patience and tender care", completed: true },
-  { text: "I will respect your feelings always and honor your voice", completed: true },
-  { text: "I will work on my anger every single day", completed: true },
-  { text: "I will cherish, support, and protect you forever", completed: true },
-];
-
 export default function ApologySection() {
   const [promises, setPromises] = useState<PromiseItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,31 +43,19 @@ export default function ApologySection() {
         const mapped = data.map((doc: any) => ({
           $id: doc.$id,
           text: doc.text,
-          completed: doc.completed ?? true,
+          completed: doc.completed ?? false,
         }));
         setPromises(mapped);
         console.log(`✅ Loaded ${mapped.length} promises from Appwrite`);
       } else {
-        console.log('📝 No promises in Appwrite, using defaults');
-        setPromises(DEFAULT_PROMISES);
-        
-        // Try to save defaults to Appwrite
-        try {
-          for (const promise of DEFAULT_PROMISES) {
-            await createPromise({
-              text: promise.text,
-              completed: promise.completed,
-            });
-          }
-          console.log('✅ Default promises saved to Appwrite');
-        } catch (saveErr) {
-          console.log('📝 Could not save defaults to Appwrite');
-        }
+        // ✅ No defaults - just show empty state
+        console.log('📝 No promises in Appwrite');
+        setPromises([]);
       }
     } catch (err) {
       console.error('❌ Error loading promises:', err);
-      setPromises(DEFAULT_PROMISES);
-      setErrorMessage('Failed to load from Appwrite. Using local data.');
+      setPromises([]);
+      setErrorMessage('Failed to load from Appwrite.');
     } finally {
       setLoading(false);
     }
@@ -368,48 +347,58 @@ export default function ApologySection() {
           ) : (
             <>
               <div className="promises-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {promises.map((promise, index) => (
-                  <div 
-                    key={promise.$id || index}
-                    className={`promise-item ${promise.completed ? 'completed' : ''}`}
-                    onClick={() => togglePromise(promise)}
-                  >
-                    <div className="promise-checkbox">
-                      {promise.completed ? '☑️' : '⬜'}
-                    </div>
+                {promises.length === 0 ? (
+                  <div className="empty-state" style={{ padding: '2rem' }}>
+                    <div className="empty-icon">📝</div>
+                    <h4>No commitments yet</h4>
+                    <p>Add your first commitment above.</p>
+                  </div>
+                ) : (
+                  promises.map((promise, index) => (
+                    <div 
+                      key={promise.$id || index}
+                      className={`promise-item ${promise.completed ? 'completed' : ''}`}
+                      onClick={() => togglePromise(promise)}
+                    >
+                      <div className="promise-checkbox">
+                        {promise.completed ? '☑️' : '⬜'}
+                      </div>
 
-                    <div className="promise-text" style={{ flex: 1 }}>
-                      {editingId === promise.$id ? (
-                        <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }} onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="text"
-                            value={editText}
-                            onChange={(e) => setEditText(e.target.value)}
-                            style={{ flex: 1, padding: '0.35rem 0.65rem', fontSize: '0.85rem' }}
-                            autoFocus
-                          />
-                          <button className="crud-icon-btn edit-btn" onClick={(e) => saveEdit(promise, e)}>💾</button>
-                          <button className="crud-icon-btn" onClick={(e) => { e.stopPropagation(); setEditingId(null); }}>✕</button>
+                      <div className="promise-text" style={{ flex: 1 }}>
+                        {editingId === promise.$id ? (
+                          <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }} onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              style={{ flex: 1, padding: '0.35rem 0.65rem', fontSize: '0.85rem' }}
+                              autoFocus
+                            />
+                            <button className="crud-icon-btn edit-btn" onClick={(e) => saveEdit(promise, e)}>💾</button>
+                            <button className="crud-icon-btn" onClick={(e) => { e.stopPropagation(); setEditingId(null); }}>✕</button>
+                          </div>
+                        ) : (
+                          <p>{promise.text}</p>
+                        )}
+                      </div>
+
+                      {editingId !== promise.$id && (
+                        <div style={{ display: 'flex', gap: '0.35rem' }} onClick={(e) => e.stopPropagation()}>
+                          <button className="crud-icon-btn edit-btn" onClick={(e) => startEdit(promise, e)}>✏️</button>
+                          <button className="crud-icon-btn delete-btn" onClick={(e) => handleDeletePromise(promise, e)}>🗑️</button>
                         </div>
-                      ) : (
-                        <p>{promise.text}</p>
                       )}
                     </div>
-
-                    {editingId !== promise.$id && (
-                      <div style={{ display: 'flex', gap: '0.35rem' }} onClick={(e) => e.stopPropagation()}>
-                        <button className="crud-icon-btn edit-btn" onClick={(e) => startEdit(promise, e)}>✏️</button>
-                        <button className="crud-icon-btn delete-btn" onClick={(e) => handleDeletePromise(promise, e)}>🗑️</button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
               
-              <div className="commitment-note" style={{ marginTop: '1.5rem' }}>
-                <p>These are not just words. These are my sacred promises to you.</p>
-                <p>I will prove every day through my actions that I am changing.</p>
-              </div>
+              {promises.length > 0 && (
+                <div className="commitment-note" style={{ marginTop: '1.5rem' }}>
+                  <p>These are not just words. These are my sacred promises to you.</p>
+                  <p>I will prove every day through my actions that I am changing.</p>
+                </div>
+              )}
             </>
           )}
         </div>

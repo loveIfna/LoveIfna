@@ -2334,3 +2334,212 @@ body.modal-open .floating-love-btn {
     font-size: 0.9rem !important;
   }
 }
+
+/* ============================================================
+   PHOTO VAULT GRID - Mobile Responsive
+   ============================================================ */
+
+.photos-vault-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* ✅ Desktop: 3-4 columns */
+@media (min-width: 1024px) {
+  .photos-vault-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ✅ Tablet: 2 columns */
+@media (max-width: 1024px) and (min-width: 768px) {
+  .photos-vault-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.2rem;
+  }
+}
+
+/* ✅ Mobile: 2 columns side by side */
+@media (max-width: 768px) {
+  .photos-vault-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.8rem;
+  }
+  
+  .photo-vault-card {
+    border-radius: var(--radius-md);
+  }
+  
+  .photo-wrapper {
+    padding-top: 75%; /* 4:3 aspect ratio for better mobile view */
+  }
+  
+  .photo-info {
+    padding: 0.8rem;
+    gap: 0.3rem;
+  }
+  
+  .photo-title {
+    font-size: 0.85rem;
+    margin: 0;
+    line-height: 1.2;
+  }
+  
+  .photo-caption {
+    font-size: 0.75rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+  }
+  
+  .photo-meta {
+    font-size: 0.7rem;
+    padding-top: 0.3rem;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+  }
+  
+  .photo-meta-author {
+    font-size: 0.7rem;
+  }
+  
+  .like-btn {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.3rem;
+  }
+  
+  .photo-author-badge {
+    width: 28px;
+    height: 28px;
+    font-size: 0.9rem;
+    top: 0.4rem;
+    right: 0.4rem;
+  }
+  
+  .zoom-badge {
+    font-size: 0.65rem;
+    padding: 0.3rem 0.6rem;
+  }
+  
+  .photo-actions .action-icon-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 0.7rem;
+  }
+  
+  /* Hide edit/delete on mobile by default, show on hover/tap */
+  .photo-actions {
+    opacity: 0.6;
+  }
+  
+  .photo-actions .action-icon-btn {
+    background: rgba(255,255,255,0.8);
+    border-radius: 50%;
+  }
+}
+
+/* ✅ Very small screens */
+@media (max-width: 480px) {
+  .photos-vault-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+  
+  .photo-info {
+    padding: 0.6rem;
+  }
+  
+  .photo-title {
+    font-size: 0.75rem;
+  }
+  
+  .photo-caption {
+    font-size: 0.65rem;
+    -webkit-line-clamp: 1;
+  }
+  
+  .photo-meta {
+    font-size: 0.6rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+  }
+  
+  .photo-author-badge {
+    width: 24px;
+    height: 24px;
+    font-size: 0.7rem;
+    top: 0.3rem;
+    right: 0.3rem;
+  }
+}
+
+/* ✅ Keep letters grid responsive too */
+@media (max-width: 768px) {
+  .letters-vault-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .letter-vault-card {
+    padding: 1.2rem;
+  }
+  
+  .letter-card-title {
+    font-size: 1.1rem;
+  }
+  
+  .letter-card-preview {
+    font-size: 0.85rem;
+    -webkit-line-clamp: 2;
+  }
+  
+  .letter-card-header {
+    flex-wrap: wrap;
+  }
+  
+  .letter-card-author {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.5rem;
+  }
+  
+  .letter-card-date {
+    font-size: 0.65rem;
+  }
+  
+  .letter-card-footer {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+/* ✅ Photo card hover effect on mobile */
+@media (max-width: 768px) {
+  .photo-vault-card {
+    transition: transform 0.2s ease;
+  }
+  
+  .photo-vault-card:active {
+    transform: scale(0.97);
+  }
+  
+  .photo-overlay {
+    background: rgba(44, 38, 37, 0.2);
+  }
+  
+  .photo-overlay .zoom-badge {
+    font-size: 0.6rem;
+    padding: 0.2rem 0.5rem;
+  }
+}
+
+/* ✅ Decrypting state on mobile */
+@media (max-width: 768px) {
+  .photo-wrapper .decrypting-placeholder {
+    height: 150px !important;
+    font-size: 0.75rem !important;
+  }
+}

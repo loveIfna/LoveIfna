@@ -435,9 +435,7 @@ export default function PrivateFolder() {
       <div className="private-folder-content" style={{ marginTop: '1.5rem' }}>
         <div className="folder-top-bar">
           <div className="folder-title-area">
-            <h2>🤭 Private Vault</h2>
-            <p>Read, write, edit & manage confidential notes, letters, and couple photos.</p>
-          </div>
+            <h2>🤭 Private Vault</h2>          </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <div className="folder-tabs">
