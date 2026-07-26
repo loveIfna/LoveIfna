@@ -457,8 +457,6 @@ export async function createEncryptedLetter(data: {
       date: new Date().toISOString().split('T')[0],
       type: 'love_letter',
       isEncrypted: true,
-      encryption_version: 1,
-      algorithm: 'AES-GCM-256',
     });
 
     console.log('✅ Encrypted letter saved');
@@ -520,8 +518,6 @@ export async function createEncryptedNote(data: { text: string; from?: string })
       date: new Date().toISOString().split('T')[0],
       type: 'love_note',
       isEncrypted: true,
-      encryption_version: 1,
-      algorithm: 'AES-GCM-256',
     });
 
     console.log('✅ Encrypted note saved');
@@ -584,8 +580,6 @@ export async function createEncryptedPrivateLetter(data: {
       date: new Date().toISOString().split('T')[0],
       type: 'private_letter',
       isEncrypted: true,
-      encryption_version: 1,
-      algorithm: 'AES-GCM-256',
     });
 
     console.log('✅ Encrypted private letter saved');
@@ -696,8 +690,6 @@ export async function createEncryptedPrivatePhoto(data: {
       date: new Date().toISOString().split('T')[0],
       type: 'private_photo',
       isEncrypted: true,
-      encryption_version: 1,
-      algorithm: 'AES-GCM-256',
     });
 
     console.log('✅ Encrypted private photo saved');
@@ -782,9 +774,6 @@ export async function deleteEncryptedPrivatePhoto(id: string, fileId?: string) {
   try {
     if (!DATABASE_ID || !COLLECTIONS.PRIVATE_PHOTOS) return false;
 
-    // Best-effort cleanup of the encrypted file + its metadata record.
-    // Metadata doc ID always equals fileId (see uploadEncryptedFile), so we
-    // can delete it directly without a lookup.
     if (fileId) {
       try {
         if (BUCKET_ID) await storage.deleteFile(BUCKET_ID, fileId);
@@ -795,7 +784,6 @@ export async function deleteEncryptedPrivatePhoto(id: string, fileId?: string) {
         await databases.deleteDocument(DATABASE_ID, 'encrypted_metadata', fileId);
       } catch (e) {
         try {
-          // metadata may have landed in the fallback collection instead
           await databases.deleteDocument(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS, fileId);
         } catch (e2) {
           // not fatal — orphaned metadata doc, not the user-facing photo doc
@@ -812,11 +800,6 @@ export async function deleteEncryptedPrivatePhoto(id: string, fileId?: string) {
 }
 
 // ==================== ENCRYPTED FILE UPLOAD ====================
-// NOTE: `EncryptedFile` (from encryption.ts) now stores encrypted, iv, authTag,
-// and salt as base64 STRINGS so the object is safely JSON-serializable and
-// survives being written to/read from the database. Do not treat these
-// fields as Buffer/Uint8Array anywhere in this file.
-
 export async function uploadEncryptedFile(file: File, metadata?: any) {
   try {
     if (!BUCKET_ID) throw new Error('Storage bucket not configured');
@@ -824,10 +807,8 @@ export async function uploadEncryptedFile(file: File, metadata?: any) {
 
     console.log('🔒 Encrypting file before upload...');
 
-    // Encrypt the file before uploading. encryptedFile.encrypted is a base64 string.
     const encryptedFile: EncryptedFile = await encryptionService.encryptFile(file);
 
-    // Convert the base64 encrypted payload back into raw bytes for upload.
     const encryptedBytes = Buffer.from(encryptedFile.encrypted, 'base64');
     const encryptedBlob = new Blob([encryptedBytes]);
     const encryptedFileObj = new File(
@@ -836,11 +817,8 @@ export async function uploadEncryptedFile(file: File, metadata?: any) {
       { type: 'application/octet-stream' }
     );
 
-    // Upload encrypted file to Appwrite Storage
     const uploaded = await storage.createFile(BUCKET_ID, ID.unique(), encryptedFileObj);
 
-    // Store encryption metadata in database.
-    // iv / authTag / salt are already base64 strings — store as-is.
     const encryptedData = {
       fileId: uploaded.$id,
       originalName: file.name,
@@ -855,14 +833,8 @@ export async function uploadEncryptedFile(file: File, metadata?: any) {
       algorithm: encryptedFile.algorithm,
       metadata: metadata ? JSON.stringify(metadata) : '',
       isEncrypted: true,
-      encryption_version: 1,
     };
 
-    // Store metadata using the SAME document ID as the uploaded file
-    // (uploaded.$id), not a fresh ID.unique(). This lets downloadEncryptedFile
-    // and deleteEncryptedPrivatePhoto look the metadata up directly by fileId
-    // via getDocument()/deleteDocument() instead of listing + scanning every
-    // document (you need an 'encrypted_metadata' collection created in Appwrite).
     try {
       await databases.createDocument(DATABASE_ID, 'encrypted_metadata', uploaded.$id, encryptedData);
     } catch (e) {
@@ -888,12 +860,10 @@ export async function downloadEncryptedFile(fileId: string) {
 
     console.log('🔓 Downloading and decrypting file...');
 
-    // Get file metadata - try both collections
     let metadata: any = null;
     try {
       metadata = await databases.getDocument(DATABASE_ID, 'encrypted_metadata', fileId);
     } catch {
-      // Try private_photos collection
       const docs = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS);
       metadata = docs.documents.find((d: any) => d.fileId === fileId || d.$id === fileId);
     }
@@ -902,15 +872,12 @@ export async function downloadEncryptedFile(fileId: string) {
       throw new Error('File is not encrypted or metadata not found');
     }
 
-    // Basic sanity check before handing off to the encryption service —
-    // this is what used to surface as a vague "error hash and iv".
     for (const field of ['iv', 'authTag', 'salt', 'fileHash', 'keyId'] as const) {
       if (!metadata[field] || typeof metadata[field] !== 'string') {
         throw new Error(`Encrypted file metadata is missing or malformed field: ${field}`);
       }
     }
 
-    // Download encrypted file bytes from Appwrite
     const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
     const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
 
@@ -924,8 +891,6 @@ export async function downloadEncryptedFile(fileId: string) {
 
     const encryptedArrayBuffer = await response.arrayBuffer();
 
-    // Reconstruct EncryptedFile object — encrypted must be base64, matching
-    // what encryptionService.decryptFile()/rehydrateEncryptedFile() expect.
     const encryptedFile: EncryptedFile = {
       encrypted: Buffer.from(encryptedArrayBuffer).toString('base64'),
       iv: metadata.iv,
@@ -937,8 +902,6 @@ export async function downloadEncryptedFile(fileId: string) {
       algorithm: metadata.algorithm || 'AES-GCM-256',
     };
 
-    // Decrypt file (decryptFile already verifies integrity internally and
-    // throws if the hash doesn't match, so no need to re-verify here).
     const decryptedData = await encryptionService.decryptFile(encryptedFile);
 
     console.log('✅ File decrypted successfully');
