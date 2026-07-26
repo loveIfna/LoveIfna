@@ -1335,6 +1335,8 @@ body.modal-open .floating-love-btn {
 
 .pin-display-group { position: relative; display: flex; justify-content: center; gap: 0.6rem; margin-bottom: 0.5rem; }
 
+/* Update this in globals.css */
+
 .code-input-hidden {
   width: 100%;
   padding: 1rem 1.2rem;
@@ -1342,19 +1344,19 @@ body.modal-open .floating-love-btn {
   border: 1.5px solid var(--border-light);
   background: var(--bg-card-solid);
   font-size: 1.3rem;
-  letter-spacing: 6px;
+  letter-spacing: 2px; /* Reduced from 6px for better readability */
   text-align: center;
   color: var(--text-main);
   outline: none;
   transition: all 0.25s ease;
   font-family: var(--font-sans);
+  min-width: 200px;
 }
 
 .code-input-hidden:focus {
   border-color: var(--accent-gold-dark);
   box-shadow: 0 0 0 3.5px rgba(197, 168, 128, 0.25);
 }
-
 .shake-animation { animation: shake 0.45s ease-in-out; }
 
 @keyframes shake {

@@ -313,43 +313,43 @@ export default function PrivateFolder() {
     }
   };
 
-  // ========== LOCK SCREEN ==========
-  if (!isAuthenticated) {
-    return (
-      <div className="private-folder-lock">
-        <div className={`lock-box ${shake ? 'shake-animation' : ''}`}>
-          <div className="lock-shield-icon">🛡️</div>
-          <h2>Secured Private Vault</h2>
-          <p>Enter the passcode to view and manage our private letters and couple photos.</p>
+ // ========== LOCK SCREEN ==========
+if (!isAuthenticated) {
+  return (
+    <div className="private-folder-lock">
+      <div className={`lock-box ${shake ? 'shake-animation' : ''}`}>
+        <div className="lock-shield-icon">🛡️</div>
+        <h2>Secured Private Vault</h2>
+        <p>Enter the passcode to view and manage our private letters and couple photos.</p>
 
-          <form onSubmit={handleCodeSubmit} className="code-form">
-            <div className="pin-display-group">
-              <input
-                type="password"
-                value={inputCode}
-                onChange={(e) => setInputCode(e.target.value)}
-                placeholder="••••••"
-                className="code-input-hidden"
-                disabled={verifying}
-                maxLength={10}
-                autoFocus
-              />
-            </div>
-
-            {error && <div className="code-error">{error}</div>}
-
-            <button type="submit" className="code-btn" disabled={verifying}>
-              {verifying ? 'Unlocking Vault...' : 'Unlock Private Vault 🗝️'}
-            </button>
-          </form>
-
-          <div className="security-badge-footer">
-            <span>🔒 Confidential Private Space</span>
+        <form onSubmit={handleCodeSubmit} className="code-form">
+          <div className="pin-display-group">
+            <input
+              type="password"
+              value={inputCode}
+              onChange={(e) => setInputCode(e.target.value)}
+              placeholder="Enter access code"
+              className="code-input-hidden"
+              disabled={verifying}
+              // REMOVED: maxLength={10}
+              autoFocus
+            />
           </div>
+
+          {error && <div className="code-error">{error}</div>}
+
+          <button type="submit" className="code-btn" disabled={verifying}>
+            {verifying ? 'Unlocking Vault...' : 'Unlock Private Vault 🗝️'}
+          </button>
+        </form>
+
+        <div className="security-badge-footer">
+          <span>🔒 Confidential Private Space</span>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   // ========== VAULT UI ==========
   return (
