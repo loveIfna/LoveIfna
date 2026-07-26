@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { account } from '../components/lib/appwrite';
+import { encryptionService } from '../components/lib/encryption';
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -20,27 +21,28 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setLoading(true);
 
     try {
-      // Only allow specific email
       if (email.toLowerCase() !== 'ifnashaikh@gmail.com') {
         setError('Access denied. Please use the authorized email.');
         setLoading(false);
         return;
       }
 
+      // Login with Appwrite
       await account.createEmailSession(email, password);
+      
+      // 🔐 Initialize encryption with user's password (silent)
+      encryptionService.initialize(password);
+      
+      localStorage.setItem('love_app_logged_in', 'true');
       onLogin();
     } catch (err: any) {
       if (err.code === 409) {
-        try {
-          await account.createEmailSession(email, password);
-          onLogin();
-          return;
-        } catch (loginErr: any) {
-          setError(loginErr.message || 'Login failed. Please try again.');
-        }
-      } else {
-        setError(err.message || 'Login failed. Please check your credentials.');
+        encryptionService.initialize(password);
+        localStorage.setItem('love_app_logged_in', 'true');
+        onLogin();
+        return;
       }
+      setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -62,6 +64,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               placeholder="Enter your email"
               required
               className="login-input"
+              autoFocus
             />
           </div>
           

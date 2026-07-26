@@ -2,7 +2,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getLetters, createLetter, updateLetter, deleteLetter } from '../components/lib/database';
+import { 
+  getEncryptedLetters as getLetters, 
+  createEncryptedLetter as createLetter, 
+  updateLetter, 
+  deleteLetter 
+} from '../components/lib/database';
+
 
 interface Letter {
   $id: string;

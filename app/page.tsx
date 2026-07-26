@@ -11,6 +11,7 @@ import LoveCounter from './components/LoveCounter';
 import ApologySection from './components/ApologySection';
 import LoginPage from './components/LoginPage';
 import PrivateFolder from './components/PrivateFolder';
+import { encryptionService } from './components/lib/encryption';
 
 type SectionType = 'home' | 'letter' | 'memories' | 'notes' | 'apology' | 'private';
 
@@ -184,17 +185,21 @@ useEffect(() => {
     setIsLoggedIn(true);
   };
 
-  const handleLogout = async () => {
-    try {
-      localStorage.removeItem('love_app_logged_in');
-      sessionStorage.removeItem('private_vault_unlocked');
-      await account.deleteSession('current');
-    } catch (error) {
-      console.log('Logout notice:', error);
-    } finally {
-      setIsLoggedIn(false);
-    }
-  };
+ // In page.tsx, update handleLogout:
+const handleLogout = async () => {
+  try {
+    // 🧹 Clear encryption keys from memory
+    encryptionService.clearSensitiveData();
+    
+    localStorage.removeItem('love_app_logged_in');
+    sessionStorage.removeItem('private_vault_unlocked');
+    await account.deleteSession('current');
+  } catch (error) {
+    console.log('Logout notice:', error);
+  } finally {
+    setIsLoggedIn(false);
+  }
+};
 
   const navigateTo = (section: SectionType) => {
     setCurrentSection(section);
