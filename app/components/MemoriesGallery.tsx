@@ -33,7 +33,7 @@ export default function MemoriesGallery() {
   const [emoji, setEmoji] = useState('🌟');
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
 
-  const emojis = ['😍', '🥰', '😘', '😊', '❤️', '💕', '💖', '🎀', '💎', '✨', '🍄', '🍑', '🌸', '🌹'];
+  const emojis = ['😍', '🥰', '😘', '😊', '❤️', '💕', '💖', '🎀', '💎', '✨', '🍄', '🍑', '🎀', '🌹'];
 
   useEffect(() => {
     loadMemories();

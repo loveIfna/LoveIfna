@@ -424,7 +424,7 @@ export default function PrivateFolder() {
   return (
     <>
       <div className="private-folder-content" style={{ marginTop: '1rem' }}>
-        {/* Header Bar - Updated Layout */}
+        {/* Header Bar - Split Layout */}
         <div className="folder-top-bar" style={{ padding: '0.8rem 1rem' }}>
           <div className="folder-title-area">
             <h2 style={{ fontSize: '1.3rem' }}>🤭 Private Vault</h2>
@@ -525,7 +525,7 @@ export default function PrivateFolder() {
                 >
                   <div className="letter-card-header">
                     <span className={`letter-card-author ${letter.author === 'Amna' ? 'amna' : 'lateef'}`} style={{ fontSize: '0.6rem' }}>
-                      {letter.author === 'Amna' ? '🌸 Amna' : '💙 Lateef'}
+                      {letter.author === 'Amna' ? '🎀 Amna' : '❤️ Lateef'}
                     </span>
                     <span className="letter-card-date" style={{ fontSize: '0.6rem' }}>{letter.date}</span>
                   </div>
@@ -559,11 +559,11 @@ export default function PrivateFolder() {
           </div>
         )}
 
-        {/* PHOTOS SECTION - 4 per row on mobile */}
+        {/* PHOTOS SECTION - 2 photos per row with bigger buttons */}
         {activeTab === 'photos' && !loading && (
           <div className="photos-vault-grid" style={{ 
-            gap: '0.4rem', 
-            gridTemplateColumns: 'repeat(4, 1fr)'
+            gap: '0.8rem', 
+            gridTemplateColumns: 'repeat(2, 1fr)'
           }}>
             {photos.length === 0 ? (
               <div className="empty-state" style={{ padding: '2rem', gridColumn: '1 / -1' }}>
@@ -585,9 +585,9 @@ export default function PrivateFolder() {
                         setSelectedPhoto({ ...photo, url: imageUrl });
                       }
                     }}
-                    style={{ borderRadius: '8px', overflow: 'hidden' }}
+                    style={{ borderRadius: '12px', overflow: 'hidden' }}
                   >
-                    <div className="photo-wrapper" style={{ paddingTop: '100%' }}>
+                    <div className="photo-wrapper" style={{ paddingTop: '75%' }}>
                       {isDecrypting ? (
                         <div style={{ 
                           position: 'absolute', 
@@ -597,12 +597,12 @@ export default function PrivateFolder() {
                           justifyContent: 'center',
                           background: '#f5f0ed',
                           color: 'var(--text-light)',
-                          fontSize: '0.55rem',
+                          fontSize: '0.8rem',
                           flexDirection: 'column',
-                          gap: '0.1rem'
+                          gap: '0.2rem'
                         }}>
                           <span>🔓</span>
-                          <span>Decrypt...</span>
+                          <span>Decrypting...</span>
                         </div>
                       ) : imageUrl ? (
                         <img
@@ -626,36 +626,34 @@ export default function PrivateFolder() {
                           justifyContent: 'center',
                           background: '#f5f0ed',
                           color: 'var(--text-light)',
-                          fontSize: '0.55rem',
-                          gap: '0.1rem'
+                          fontSize: '0.8rem',
+                          gap: '0.2rem'
                         }}>
                           <span>🔒</span>
-                          <span>Tap</span>
+                          <span>Tap to decrypt</span>
                         </div>
                       )}
                       <div className="photo-overlay">
-                        <span className="zoom-badge" style={{ fontSize: '0.5rem', padding: '0.1rem 0.3rem' }}>🔍</span>
+                        <span className="zoom-badge" style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }}>🔍 View</span>
                       </div>
-                      <div className="photo-author-badge" style={{ width: '18px', height: '18px', fontSize: '0.5rem', top: '0.15rem', right: '0.15rem' }}>
-                        {photo.author === 'Amna' ? '🌸' : '💙'}
+                      <div className="photo-author-badge" style={{ width: '28px', height: '28px', fontSize: '0.8rem', top: '0.5rem', right: '0.5rem' }}>
+                        {photo.author === 'Amna' ? '🎀' : '❤️'}
                       </div>
                     </div>
 
-                    <div className="photo-info" style={{ padding: '0.3rem', gap: '0.1rem' }}>
+                    <div className="photo-info" style={{ padding: '0.6rem', gap: '0.3rem' }}>
                       <div className="photo-header" style={{ alignItems: 'center' }}>
-                        <h4 className="photo-title" style={{ fontSize: '0.55rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '45px' }}>
-                          {photo.title}
-                        </h4>
-                        <div className="photo-actions" onClick={(e) => e.stopPropagation()} style={{ gap: '0.1rem' }}>
+                        <h4 className="photo-title" style={{ fontSize: '0.85rem', fontWeight: 600 }}>{photo.title}</h4>
+                        <div className="photo-actions" onClick={(e) => e.stopPropagation()} style={{ gap: '0.3rem' }}>
                           <button
                             className="action-icon-btn edit"
                             onClick={(e) => openEditPhotoModal(photo, e)}
-                            style={{ width: '16px', height: '16px', fontSize: '0.45rem' }}
+                            style={{ width: '28px', height: '28px', fontSize: '0.7rem' }}
                           >
                             ✏️
                           </button>
                           {confirmDeleteId === photo.$id ? (
-                            <div className="confirm-delete-box" style={{ fontSize: '0.4rem' }}>
+                            <div className="confirm-delete-box" style={{ fontSize: '0.6rem' }}>
                               <span>Delete?</span>
                               <button className="confirm-yes" onClick={(e) => handleDeletePhoto(photo.$id, e)}>Yes</button>
                               <button className="confirm-no" onClick={() => setConfirmDeleteId(null)}>No</button>
@@ -664,7 +662,7 @@ export default function PrivateFolder() {
                             <button
                               className="action-icon-btn delete"
                               onClick={() => setConfirmDeleteId(photo.$id)}
-                              style={{ width: '16px', height: '16px', fontSize: '0.45rem' }}
+                              style={{ width: '28px', height: '28px', fontSize: '0.7rem' }}
                             >
                               🗑️
                             </button>
@@ -672,17 +670,13 @@ export default function PrivateFolder() {
                         </div>
                       </div>
 
-                      <p className="photo-caption" style={{ fontSize: '0.5rem', display: 'none' }}>{photo.caption}</p>
+                      <p className="photo-caption" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {photo.caption}
+                      </p>
 
-                      <div className="photo-meta" style={{ paddingTop: '0.1rem', fontSize: '0.45rem', flexWrap: 'wrap', gap: '0.1rem' }}>
-                        <span className="photo-meta-author" style={{ fontSize: '0.4rem' }}>{photo.date}</span>
-                        <button
-                          className="like-btn"
-                          onClick={(e) => handleLikePhoto(photo.$id, e)}
-                          style={{ fontSize: '0.5rem', padding: '0.05rem 0.15rem' }}
-                        >
-                          <span className="like-heart">❤️</span> {photo.likes}
-                        </button>
+                      <div className="photo-meta" style={{ paddingTop: '0.3rem', fontSize: '0.7rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="photo-meta-author">{photo.author} • {photo.date}</span>
+                        {/* ❤️ Like button removed as requested */}
                       </div>
                     </div>
                   </div>
@@ -693,7 +687,7 @@ export default function PrivateFolder() {
         )}
       </div>
 
-      {/* MODALS - Keep the same */}
+      {/* MODALS - Same as before */}
       {showWriteLetterModal && (
         <div className="modal-backdrop" onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -715,8 +709,8 @@ export default function PrivateFolder() {
                 <div className="form-group">
                   <label>Author</label>
                   <select value={letterAuthor} onChange={(e) => setLetterAuthor(e.target.value as 'Lateef' | 'Amna')} className="form-select">
-                    <option value="Lateef">💙 Lateef</option>
-                    <option value="Amna">🌸 Amna</option>
+                    <option value="Lateef">❤️ Lateef</option>
+                    <option value="Amna">🎀 Amna</option>
                   </select>
                 </div>
                 <div className="form-group">
@@ -751,7 +745,7 @@ export default function PrivateFolder() {
             <div className="letter-read-header">
               <div className="letter-read-author">
                 <span className={`letter-card-author ${selectedLetter.author === 'Amna' ? 'amna' : 'lateef'}`}>
-                  {selectedLetter.author === 'Amna' ? '🌸 Amna' : '💙 Lateef'}
+                  {selectedLetter.author === 'Amna' ? '🎀 Amna' : '❤️ Lateef'}
                 </span>
                 <span className="letter-read-date">{selectedLetter.date} • {selectedLetter.category}</span>
               </div>
@@ -784,8 +778,8 @@ export default function PrivateFolder() {
                 <div className="form-group">
                   <label>Posted By</label>
                   <select value={photoAuthor} onChange={(e) => setPhotoAuthor(e.target.value as 'Lateef' | 'Amna')} className="form-select">
-                    <option value="Lateef">💙 Lateef</option>
-                    <option value="Amna">🌸 Amna</option>
+                    <option value="Lateef">❤️ Lateef</option>
+                    <option value="Amna">🎀 Amna</option>
                   </select>
                 </div>
                 <div className="form-group">

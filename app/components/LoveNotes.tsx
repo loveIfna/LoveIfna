@@ -129,8 +129,8 @@ export default function LoveNotes() {
             className="form-select"
             style={{ width: 'auto', minWidth: '150px' }}
           >
-            <option value="Lateef">💙 From Lateef</option>
-            <option value="Amna">🌸 From Amna</option>
+            <option value="Lateef">❤️ From Lateef</option>
+            <option value="Amna">🎀 From Amna</option>
           </select>
           <textarea
             className="form-textarea"
@@ -196,7 +196,7 @@ export default function LoveNotes() {
                   <>
                     <div className="note-card-header">
                       <span className={`note-card-author ${note.from === 'Amna' ? 'amna' : 'lateef'}`}>
-                        {note.from === 'Amna' ? '🌸 Amna' : '💙 Lateef'}
+                        {note.from === 'Amna' ? '🎀 Amna' : '❤️ Lateef'}
                       </span>
                       <span className="note-card-date">{note.date}</span>
                     </div>

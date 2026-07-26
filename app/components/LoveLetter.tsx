@@ -151,8 +151,8 @@ export default function LoveLetter() {
                   onChange={(e) => setFrom(e.target.value)}
                   className="form-select"
                 >
-                  <option value="Lateef">💙 Lateef</option>
-                  <option value="Amna">🌸 Amna</option>
+                  <option value="Lateef">❤️ Lateef</option>
+                  <option value="Amna">🎀 Amna</option>
                 </select>
               </div>
               
@@ -197,7 +197,7 @@ export default function LoveLetter() {
             <div className="letter-read-header">
               <div className="letter-read-author">
                 <span className={`letter-card-author ${selectedLetter.from === 'Amna' ? 'amna' : 'lateef'}`}>
-                  {selectedLetter.from === 'Amna' ? '🌸 Amna' : '💙 Lateef'}
+                  {selectedLetter.from === 'Amna' ? '🎀 Amna' : '❤️ Lateef'}
                 </span>
                 <span className="letter-read-date">{selectedLetter.date}</span>
               </div>
@@ -268,7 +268,7 @@ export default function LoveLetter() {
               {/* Card Header */}
               <div className="letter-card-header">
                 <span className={`letter-card-author ${letter.from === 'Amna' ? 'amna' : 'lateef'}`}>
-                  {letter.from === 'Amna' ? '🌸 Amna' : '💙 Lateef'}
+                  {letter.from === 'Amna' ? '🎀 Amna' : '❤️ Lateef'}
                 </span>
                 <span className="letter-card-date">{letter.date}</span>
               </div>
