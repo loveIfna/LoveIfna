@@ -32,12 +32,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       
       // 🔐 Initialize encryption with user's password (silent)
       encryptionService.initialize(password);
+      sessionStorage.setItem('love_app_password', password);
       
       localStorage.setItem('love_app_logged_in', 'true');
       onLogin();
     } catch (err: any) {
       if (err.code === 409) {
         encryptionService.initialize(password);
+        sessionStorage.setItem('love_app_password', password);
         localStorage.setItem('love_app_logged_in', 'true');
         onLogin();
         return;

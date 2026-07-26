@@ -86,27 +86,30 @@ export default function Home() {
   }, [mobileMenuOpen]);
 
   const checkSession = async () => {
-    const storedAuth = localStorage.getItem('love_app_logged_in');
-    if (storedAuth === 'true') {
-      setIsLoggedIn(true);
-      setLoading(false);
-      return;
-    }
-
     try {
+      // Validate session with Appwrite on page load/reload
       const getSessionPromise = account.get();
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Appwrite timeout')), 1500)
+        setTimeout(() => reject(new Error('Appwrite timeout')), 2500)
       );
 
       const session = await Promise.race([getSessionPromise, timeoutPromise]);
       if (session) {
+        // Restore encryption password if stored in sessionStorage
+        const storedPassword = sessionStorage.getItem('love_app_password');
+        if (storedPassword) {
+          encryptionService.initialize(storedPassword);
+        }
         setIsLoggedIn(true);
         localStorage.setItem('love_app_logged_in', 'true');
+      } else {
+        setIsLoggedIn(false);
+        localStorage.removeItem('love_app_logged_in');
       }
     } catch (error) {
       console.log('Session check notice:', error);
       setIsLoggedIn(false);
+      localStorage.removeItem('love_app_logged_in');
     } finally {
       setLoading(false);
     }
@@ -192,6 +195,7 @@ const handleLogout = async () => {
     encryptionService.clearSensitiveData();
     
     localStorage.removeItem('love_app_logged_in');
+    sessionStorage.removeItem('love_app_password');
     sessionStorage.removeItem('private_vault_unlocked');
     await account.deleteSession('current');
   } catch (error) {

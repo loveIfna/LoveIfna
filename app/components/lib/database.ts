@@ -16,10 +16,10 @@ const COLLECTIONS = {
 };
 
 // ============================================================
-// REGULAR (NON-ENCRYPTED) FUNCTIONS - For backward compatibility
+// REGULAR (NON-ENCRYPTED) FUNCTIONS - Plain Text Collections
 // ============================================================
 
-// ==================== LETTERS ====================
+// ==================== LETTERS (Plain) ====================
 export async function getLetters() {
   try {
     if (!DATABASE_ID || !COLLECTIONS.LETTERS) return [];
@@ -35,7 +35,8 @@ export async function createLetter(data: { title: string; content: string; from?
   try {
     if (!DATABASE_ID || !COLLECTIONS.LETTERS) throw new Error('Database or Collection not configured');
     const doc = await databases.createDocument(DATABASE_ID, COLLECTIONS.LETTERS, ID.unique(), {
-      ...data,
+      title: data.title,
+      content: data.content,
       from: data.from || 'Lateef',
       date: new Date().toISOString().split('T')[0],
       type: 'love_letter',
@@ -69,7 +70,7 @@ export async function deleteLetter(id: string) {
   }
 }
 
-// ==================== NOTES ====================
+// ==================== NOTES (Plain) ====================
 export async function getNotes() {
   try {
     if (!DATABASE_ID || !COLLECTIONS.NOTES) return [];
@@ -85,7 +86,7 @@ export async function createNote(data: { text: string; from?: string }) {
   try {
     if (!DATABASE_ID || !COLLECTIONS.NOTES) throw new Error('Database not configured');
     const doc = await databases.createDocument(DATABASE_ID, COLLECTIONS.NOTES, ID.unique(), {
-      ...data,
+      text: data.text,
       from: data.from || 'Lateef',
       date: new Date().toISOString().split('T')[0],
       type: 'love_note',
@@ -119,7 +120,7 @@ export async function deleteNote(id: string) {
   }
 }
 
-// ==================== MEMORIES ====================
+// ==================== MEMORIES (Plain) ====================
 export async function getMemories() {
   try {
     if (!DATABASE_ID || !COLLECTIONS.MEMORIES) return [];
@@ -135,7 +136,8 @@ export async function createMemory(data: { title: string; description: string; e
   try {
     if (!DATABASE_ID || !COLLECTIONS.MEMORIES) throw new Error('Database not configured');
     const doc = await databases.createDocument(DATABASE_ID, COLLECTIONS.MEMORIES, ID.unique(), {
-      ...data,
+      title: data.title,
+      description: data.description,
       emoji: data.emoji || '🌟',
       date: new Date().toISOString().split('T')[0],
       type: 'memory',
@@ -169,16 +171,14 @@ export async function deleteMemory(id: string) {
   }
 }
 
-// ==================== PROMISES ====================
-const PROMISES_COLLECTION = process.env.NEXT_PUBLIC_COLLECTION_PROMISES || COLLECTIONS.PROMISES || 'promises';
-
+// ==================== PROMISES (Plain) ====================
 export async function getPromises() {
   try {
-    if (!DATABASE_ID || !PROMISES_COLLECTION) {
+    if (!DATABASE_ID || !COLLECTIONS.PROMISES) {
       console.error('❌ Database or Collection not configured');
       return [];
     }
-    const response = await databases.listDocuments(DATABASE_ID, PROMISES_COLLECTION);
+    const response = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PROMISES);
     return response.documents;
   } catch (error: any) {
     console.error('❌ Error fetching promises:', error.message);
@@ -188,16 +188,14 @@ export async function getPromises() {
 
 export async function createPromise(data: { text: string; completed?: boolean }) {
   try {
-    if (!DATABASE_ID || !PROMISES_COLLECTION) {
+    if (!DATABASE_ID || !COLLECTIONS.PROMISES) {
       throw new Error('Database or Collection not configured');
     }
-    const uniqueId = Date.now();
     const doc = await databases.createDocument(
       DATABASE_ID,
-      PROMISES_COLLECTION,
+      COLLECTIONS.PROMISES,
       ID.unique(),
       {
-        id: uniqueId,
         text: data.text,
         completed: data.completed ?? false,
         type: 'promise',
@@ -212,10 +210,10 @@ export async function createPromise(data: { text: string; completed?: boolean })
 
 export async function updatePromise(id: string, data: Partial<{ text: string; completed: boolean }>) {
   try {
-    if (!DATABASE_ID || !PROMISES_COLLECTION) {
+    if (!DATABASE_ID || !COLLECTIONS.PROMISES) {
       throw new Error('Database or Collection not configured');
     }
-    const doc = await databases.updateDocument(DATABASE_ID, PROMISES_COLLECTION, id, data);
+    const doc = await databases.updateDocument(DATABASE_ID, COLLECTIONS.PROMISES, id, data);
     return doc;
   } catch (error: any) {
     console.error('❌ Error updating promise:', error.message);
@@ -225,10 +223,10 @@ export async function updatePromise(id: string, data: Partial<{ text: string; co
 
 export async function deletePromise(id: string) {
   try {
-    if (!DATABASE_ID || !PROMISES_COLLECTION) {
+    if (!DATABASE_ID || !COLLECTIONS.PROMISES) {
       return false;
     }
-    await databases.deleteDocument(DATABASE_ID, PROMISES_COLLECTION, id);
+    await databases.deleteDocument(DATABASE_ID, COLLECTIONS.PROMISES, id);
     return true;
   } catch (error: any) {
     console.error('❌ Error deleting promise:', error.message);
@@ -238,20 +236,19 @@ export async function deletePromise(id: string) {
 
 export async function savePromises(promises: Array<{ text: string; completed: boolean }>) {
   try {
-    if (!DATABASE_ID || !PROMISES_COLLECTION) {
+    if (!DATABASE_ID || !COLLECTIONS.PROMISES) {
       return false;
     }
     const existing = await getPromises();
     for (const promise of promises) {
       const existingDoc = existing.find((p: any) => p.text === promise.text);
       if (existingDoc && existingDoc.$id) {
-        await databases.updateDocument(DATABASE_ID, PROMISES_COLLECTION, existingDoc.$id, {
+        await databases.updateDocument(DATABASE_ID, COLLECTIONS.PROMISES, existingDoc.$id, {
           text: promise.text,
           completed: promise.completed,
         });
       } else {
-        await databases.createDocument(DATABASE_ID, PROMISES_COLLECTION, ID.unique(), {
-          id: Date.now() + Math.floor(Math.random() * 1000),
+        await databases.createDocument(DATABASE_ID, COLLECTIONS.PROMISES, ID.unique(), {
           text: promise.text,
           completed: promise.completed,
           type: 'promise',
@@ -265,7 +262,72 @@ export async function savePromises(promises: Array<{ text: string; completed: bo
   }
 }
 
-// ==================== PRIVATE LETTERS (Vault) ====================
+// ==================== PHOTOS (Plain) ====================
+export async function getPhotos() {
+  try {
+    if (!DATABASE_ID || !COLLECTIONS.PHOTOS) return [];
+    const response = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PHOTOS);
+    return response.documents;
+  } catch (error) {
+    console.error('Error fetching photos:', error);
+    return [];
+  }
+}
+
+export async function createPhoto(data: {
+  title: string;
+  description?: string;
+  emoji?: string;
+  fileId?: string;
+  url?: string;
+}) {
+  try {
+    if (!DATABASE_ID || !COLLECTIONS.PHOTOS) throw new Error('Database not configured');
+    const doc = await databases.createDocument(DATABASE_ID, COLLECTIONS.PHOTOS, ID.unique(), {
+      title: data.title,
+      description: data.description || '',
+      emoji: data.emoji || '📸',
+      fileId: data.fileId || '',
+      url: data.url || '',
+      date: new Date().toISOString().split('T')[0],
+      type: 'gallery_photo',
+    });
+    return doc;
+  } catch (error) {
+    console.error('Error creating photo:', error);
+    throw error;
+  }
+}
+
+export async function updatePhoto(id: string, data: Partial<{
+  title: string;
+  description: string;
+  emoji: string;
+  fileId: string;
+  url: string;
+}>) {
+  try {
+    if (!DATABASE_ID || !COLLECTIONS.PHOTOS) throw new Error('Database not configured');
+    const doc = await databases.updateDocument(DATABASE_ID, COLLECTIONS.PHOTOS, id, data);
+    return doc;
+  } catch (error) {
+    console.error('Error updating photo:', error);
+    throw error;
+  }
+}
+
+export async function deletePhoto(id: string) {
+  try {
+    if (!DATABASE_ID || !COLLECTIONS.PHOTOS) return false;
+    await databases.deleteDocument(DATABASE_ID, COLLECTIONS.PHOTOS, id);
+    return true;
+  } catch (error) {
+    console.error('Error deleting photo:', error);
+    throw error;
+  }
+}
+
+// ==================== PRIVATE LETTERS (Vault - Plain, Non-encrypted) ====================
 export async function getPrivateLetters() {
   try {
     if (!DATABASE_ID || !COLLECTIONS.PRIVATE_LETTERS) return [];
@@ -286,7 +348,8 @@ export async function createPrivateLetter(data: {
   try {
     if (!DATABASE_ID || !COLLECTIONS.PRIVATE_LETTERS) throw new Error('Database not configured');
     const doc = await databases.createDocument(DATABASE_ID, COLLECTIONS.PRIVATE_LETTERS, ID.unique(), {
-      ...data,
+      title: data.title,
+      content: data.content,
       author: data.author || 'Lateef',
       category: data.category || 'Love Note',
       date: new Date().toISOString().split('T')[0],
@@ -326,7 +389,7 @@ export async function deletePrivateLetter(id: string) {
   }
 }
 
-// ==================== PRIVATE PHOTOS (Vault) ====================
+// ==================== PRIVATE PHOTOS (Vault - Plain, Non-encrypted) ====================
 export async function getPrivatePhotos() {
   try {
     if (!DATABASE_ID || !COLLECTIONS.PRIVATE_PHOTOS) return [];
@@ -348,8 +411,11 @@ export async function createPrivatePhoto(data: {
   try {
     if (!DATABASE_ID || !COLLECTIONS.PRIVATE_PHOTOS) throw new Error('Database not configured');
     const doc = await databases.createDocument(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS, ID.unique(), {
-      ...data,
+      title: data.title,
+      caption: data.caption || '',
       author: data.author || 'Lateef',
+      fileId: data.fileId || '',
+      url: data.url || '',
       likes: 0,
       date: new Date().toISOString().split('T')[0],
       type: 'private_photo',
@@ -403,159 +469,9 @@ export async function likePrivatePhoto(id: string) {
   }
 }
 
-// ==================== FILE UPLOAD ====================
-export async function uploadFile(file: File) {
-  try {
-    if (!BUCKET_ID) throw new Error('Storage bucket ID not configured');
-    const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
-    return response;
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    throw error;
-  }
-}
-
-export function getFileUrl(fileId: string) {
-  const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
-  const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
-  return `${endpoint}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${projectId}`;
-}
-
-export async function deleteFile(fileId: string) {
-  try {
-    if (!BUCKET_ID || !fileId) return false;
-    await storage.deleteFile(BUCKET_ID, fileId);
-    return true;
-  } catch (error) {
-    console.error('Error deleting file:', error);
-    throw error;
-  }
-}
-
 // ============================================================
-// END-TO-END ENCRYPTED FUNCTIONS
+// END-TO-END ENCRYPTED FUNCTIONS (Private Vault Only)
 // ============================================================
-
-// ==================== ENCRYPTED LETTERS ====================
-export async function createEncryptedLetter(data: {
-  title: string;
-  content: string;
-  from?: string
-}) {
-  try {
-    if (!DATABASE_ID || !COLLECTIONS.LETTERS) throw new Error('Database or Collection not configured');
-
-    console.log('🔒 Encrypting letter...');
-
-    const encryptedTitle = await encryptionService.encryptText(data.title);
-    const encryptedContent = await encryptionService.encryptText(data.content);
-
-    const doc = await databases.createDocument(DATABASE_ID, COLLECTIONS.LETTERS, ID.unique(), {
-      title_encrypted: JSON.stringify(encryptedTitle),
-      content_encrypted: JSON.stringify(encryptedContent),
-      from: data.from || 'Lateef',
-      date: new Date().toISOString().split('T')[0],
-      type: 'love_letter',
-      isEncrypted: true,
-    });
-
-    console.log('✅ Encrypted letter saved');
-    return doc;
-  } catch (error) {
-    console.error('❌ Error creating encrypted letter:', error);
-    throw error;
-  }
-}
-
-export async function getEncryptedLetters() {
-  try {
-    if (!DATABASE_ID || !COLLECTIONS.LETTERS) return [];
-
-    console.log('🔓 Fetching and decrypting letters...');
-
-    const response = await databases.listDocuments(DATABASE_ID, COLLECTIONS.LETTERS);
-
-    const decryptedDocs = await Promise.all(
-      response.documents.map(async (doc: any) => {
-        if (doc.isEncrypted && doc.title_encrypted && doc.content_encrypted) {
-          try {
-            const titleData = JSON.parse(doc.title_encrypted) as EncryptedData;
-            const contentData = JSON.parse(doc.content_encrypted) as EncryptedData;
-
-            const title = await encryptionService.decryptText(titleData);
-            const content = await encryptionService.decryptText(contentData);
-
-            return { ...doc, title, content, title_encrypted: undefined, content_encrypted: undefined };
-          } catch (decryptError) {
-            console.error('⚠️ Failed to decrypt letter:', decryptError);
-            return doc;
-          }
-        }
-        return doc;
-      })
-    );
-
-    console.log(`✅ Decrypted ${decryptedDocs.length} letters`);
-    return decryptedDocs;
-  } catch (error) {
-    console.error('❌ Error fetching encrypted letters:', error);
-    return [];
-  }
-}
-
-// ==================== ENCRYPTED NOTES ====================
-export async function createEncryptedNote(data: { text: string; from?: string }) {
-  try {
-    if (!DATABASE_ID || !COLLECTIONS.NOTES) throw new Error('Database not configured');
-
-    console.log('🔒 Encrypting note...');
-
-    const encryptedText = await encryptionService.encryptText(data.text);
-
-    const doc = await databases.createDocument(DATABASE_ID, COLLECTIONS.NOTES, ID.unique(), {
-      text_encrypted: JSON.stringify(encryptedText),
-      from: data.from || 'Lateef',
-      date: new Date().toISOString().split('T')[0],
-      type: 'love_note',
-      isEncrypted: true,
-    });
-
-    console.log('✅ Encrypted note saved');
-    return doc;
-  } catch (error) {
-    console.error('❌ Error creating encrypted note:', error);
-    throw error;
-  }
-}
-
-export async function getEncryptedNotes() {
-  try {
-    if (!DATABASE_ID || !COLLECTIONS.NOTES) return [];
-
-    const response = await databases.listDocuments(DATABASE_ID, COLLECTIONS.NOTES);
-
-    const decryptedDocs = await Promise.all(
-      response.documents.map(async (doc: any) => {
-        if (doc.isEncrypted && doc.text_encrypted) {
-          try {
-            const textData = JSON.parse(doc.text_encrypted) as EncryptedData;
-            const text = await encryptionService.decryptText(textData);
-            return { ...doc, text, text_encrypted: undefined };
-          } catch (decryptError) {
-            console.error('⚠️ Failed to decrypt note:', decryptError);
-            return doc;
-          }
-        }
-        return doc;
-      })
-    );
-
-    return decryptedDocs;
-  } catch (error) {
-    console.error('❌ Error fetching encrypted notes:', error);
-    return [];
-  }
-}
 
 // ==================== ENCRYPTED PRIVATE LETTERS (Vault) ====================
 export async function createEncryptedPrivateLetter(data: {
@@ -704,6 +620,8 @@ export async function getEncryptedPrivatePhotos() {
   try {
     if (!DATABASE_ID || !COLLECTIONS.PRIVATE_PHOTOS) return [];
 
+    console.log('🔓 Fetching encrypted private photos...');
+
     const response = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS);
 
     const decryptedDocs = await Promise.all(
@@ -723,7 +641,13 @@ export async function getEncryptedPrivatePhotos() {
               }
             }
 
-            return { ...doc, title, caption, title_encrypted: undefined, caption_encrypted: undefined };
+            return { 
+              ...doc, 
+              title, 
+              caption, 
+              title_encrypted: undefined, 
+              caption_encrypted: undefined 
+            };
           } catch (decryptError) {
             console.error('⚠️ Failed to decrypt private photo:', decryptError);
             return doc;
@@ -733,6 +657,7 @@ export async function getEncryptedPrivatePhotos() {
       })
     );
 
+    console.log(`✅ Decrypted ${decryptedDocs.length} private photos`);
     return decryptedDocs;
   } catch (error) {
     console.error('❌ Error fetching encrypted private photos:', error);
@@ -828,22 +753,19 @@ export async function uploadEncryptedFile(file: File, metadata?: any) {
       authTag: encryptedFile.authTag,
       salt: encryptedFile.salt,
       keyId: encryptedFile.keyId,
-      version: encryptedFile.version,
+      version: encryptedFile.version || 1,
       fileHash: encryptedFile.fileHash,
-      algorithm: encryptedFile.algorithm,
+      algorithm: encryptedFile.algorithm || 'AES-GCM-256',
       metadata: metadata ? JSON.stringify(metadata) : '',
       isEncrypted: true,
     };
 
-    try {
-      await databases.createDocument(DATABASE_ID, 'encrypted_metadata', uploaded.$id, encryptedData);
-    } catch (e) {
-      console.log('Metadata collection may not exist. Storing in default collection.');
-      await databases.createDocument(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS, uploaded.$id, {
-        ...encryptedData,
-        type: 'encrypted_file_metadata',
-      });
-    }
+    await databases.createDocument(
+      DATABASE_ID, 
+      'encrypted_metadata',
+      uploaded.$id,    
+      encryptedData
+    );
 
     console.log('✅ Encrypted file uploaded');
     return uploaded;
@@ -861,11 +783,20 @@ export async function downloadEncryptedFile(fileId: string) {
     console.log('🔓 Downloading and decrypting file...');
 
     let metadata: any = null;
+    
     try {
       metadata = await databases.getDocument(DATABASE_ID, 'encrypted_metadata', fileId);
+      console.log('📦 Metadata found in encrypted_metadata');
     } catch {
-      const docs = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS);
-      metadata = docs.documents.find((d: any) => d.fileId === fileId || d.$id === fileId);
+      try {
+        const docs = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PRIVATE_PHOTOS);
+        metadata = docs.documents.find((d: any) => d.fileId === fileId || d.$id === fileId);
+        if (metadata) {
+          console.log('📦 Metadata found in private_photos');
+        }
+      } catch (e) {
+        console.log('📦 Metadata not found in private_photos either');
+      }
     }
 
     if (!metadata || !metadata.isEncrypted) {
@@ -874,7 +805,7 @@ export async function downloadEncryptedFile(fileId: string) {
 
     for (const field of ['iv', 'authTag', 'salt', 'fileHash', 'keyId'] as const) {
       if (!metadata[field] || typeof metadata[field] !== 'string') {
-        throw new Error(`Encrypted file metadata is missing or malformed field: ${field}`);
+        throw new Error(`Missing or invalid field: ${field}`);
       }
     }
 
@@ -882,7 +813,8 @@ export async function downloadEncryptedFile(fileId: string) {
     const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
 
     const response = await fetch(
-      `${endpoint}/storage/buckets/${BUCKET_ID}/files/${fileId}/download?project=${projectId}`
+      `${endpoint}/storage/buckets/${BUCKET_ID}/files/${fileId}/download?project=${projectId}`,
+      { credentials: 'include' }
     );
 
     if (!response.ok) {
@@ -914,6 +846,35 @@ export async function downloadEncryptedFile(fileId: string) {
     };
   } catch (error) {
     console.error('❌ Error downloading encrypted file:', error);
+    throw error;
+  }
+}
+
+// ==================== FILE UPLOAD (Plain - For non-encrypted files) ====================
+export async function uploadFile(file: File) {
+  try {
+    if (!BUCKET_ID) throw new Error('Storage bucket ID not configured');
+    const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
+    return response;
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    throw error;
+  }
+}
+
+export function getFileUrl(fileId: string) {
+  const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
+  const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
+  return `${endpoint}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${projectId}`;
+}
+
+export async function deleteFile(fileId: string) {
+  try {
+    if (!BUCKET_ID || !fileId) return false;
+    await storage.deleteFile(BUCKET_ID, fileId);
+    return true;
+  } catch (error) {
+    console.error('Error deleting file:', error);
     throw error;
   }
 }

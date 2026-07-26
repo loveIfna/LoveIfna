@@ -36,6 +36,7 @@ interface DecryptionParams {
 class EncryptionService {
   private static instance: EncryptionService;
   private userPassword: string = '';
+  private masterKeyRaw: ArrayBuffer | null = null;
   private isInitialized: boolean = false;
 
   // OWASP recommended: 600,000 iterations for PBKDF2 (2024 guidance)
@@ -45,7 +46,7 @@ class EncryptionService {
   private readonly IV_LENGTH: number = 12;
   private readonly AUTH_TAG_LENGTH: number = 16;
   private readonly KEY_LENGTH: number = 256;
-  private readonly ENCRYPTION_VERSION: number = 1;
+  private readonly ENCRYPTION_VERSION: number = 2;
   private readonly ALGORITHM: string = 'AES-GCM-256';
 
   // Production build check - disable verbose logging in production
@@ -66,6 +67,7 @@ class EncryptionService {
    */
   public initialize(password: string): void {
     this.userPassword = password;
+    this.masterKeyRaw = null;
     this.isInitialized = true;
     if (!this.isProduction) {
       console.log('🔐 Encryption service initialized');
@@ -77,10 +79,77 @@ class EncryptionService {
    */
   public clearSensitiveData(): void {
     this.userPassword = '';
+    this.masterKeyRaw = null;
     this.isInitialized = false;
     if (!this.isProduction) {
       console.log('🧹 Sensitive data cleared from memory');
     }
+  }
+
+  /**
+   * Derive a master key raw bits from the password once and cache it
+   */
+  private async getMasterKeyRaw(): Promise<ArrayBuffer> {
+    if (this.masterKeyRaw) {
+      return this.masterKeyRaw;
+    }
+    this.ensureInitialized();
+
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(this.userPassword),
+      'PBKDF2',
+      false,
+      ['deriveBits']
+    );
+
+    const staticSalt = encoder.encode('love-app-master-salt-v2');
+
+    const derivedBits = await crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        salt: staticSalt,
+        iterations: this.PBKDF2_ITERATIONS,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      256
+    );
+
+    this.masterKeyRaw = derivedBits;
+    return derivedBits;
+  }
+
+  /**
+   * Derive a document subkey using HKDF from cached master key bits (extremely fast, <1ms)
+   */
+  private async deriveSubkeyHKDF(keyId: string, salt: Uint8Array): Promise<CryptoKey> {
+    const rawMasterKey = await this.getMasterKeyRaw();
+    const masterKey = await crypto.subtle.importKey(
+      'raw',
+      rawMasterKey,
+      'HKDF',
+      false,
+      ['deriveKey']
+    );
+
+    const encoder = new TextEncoder();
+    return await crypto.subtle.deriveKey(
+      {
+        name: 'HKDF',
+        hash: 'SHA-256',
+        salt: salt as BufferSource,
+        info: encoder.encode(keyId),
+      },
+      masterKey,
+      {
+        name: 'AES-GCM',
+        length: this.KEY_LENGTH,
+      },
+      false,
+      ['encrypt', 'decrypt']
+    );
   }
 
   /**
@@ -320,8 +389,8 @@ class EncryptionService {
     const iv = this.generateIV();
     const keyId = this.generateKeyId();
 
-    // Derive encryption key using password + keyId
-    const key = await this.deriveKey(this.userPassword + keyId, salt);
+    // Derive subkey fast using HKDF
+    const key = await this.deriveSubkeyHKDF(keyId, salt);
 
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
@@ -350,7 +419,10 @@ class EncryptionService {
     // Validate and rehydrate data
     const { encrypted, iv, authTag, salt, keyId } = this.rehydrateEncryptedData(encryptedData);
 
-    const key = await this.deriveKey(this.userPassword + keyId, salt);
+    // Support both Version 2 (HKDF) and Version 1 (PBKDF2)
+    const key = (encryptedData.version === 2)
+      ? await this.deriveSubkeyHKDF(keyId, salt)
+      : await this.deriveKey(this.userPassword + keyId, salt);
 
     const decrypted = await this.decryptWithAES(encrypted, key, iv, authTag);
 
@@ -382,7 +454,8 @@ class EncryptionService {
     const iv = this.generateIV();
     const keyId = this.generateKeyId();
 
-    const key = await this.deriveKey(this.userPassword + keyId, salt);
+    // Derive subkey fast using HKDF
+    const key = await this.deriveSubkeyHKDF(keyId, salt);
 
     const { encrypted, authTag } = await this.encryptWithAES(data, key, iv);
 
@@ -409,7 +482,10 @@ class EncryptionService {
     // Validate and rehydrate data
     const { encrypted, iv, authTag, salt, keyId } = this.rehydrateEncryptedFile(encryptedFile);
 
-    const key = await this.deriveKey(this.userPassword + keyId, salt);
+    // Support both Version 2 (HKDF) and Version 1 (PBKDF2)
+    const key = (encryptedFile.version === 2)
+      ? await this.deriveSubkeyHKDF(keyId, salt)
+      : await this.deriveKey(this.userPassword + keyId, salt);
 
     const decrypted = await this.decryptWithAES(encrypted, key, iv, authTag);
 

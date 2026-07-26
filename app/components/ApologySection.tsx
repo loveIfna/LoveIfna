@@ -10,10 +10,8 @@ import {
   deletePromise 
 } from '../components/lib/database';
 
-
 interface PromiseItem {
   $id?: string;
-  id?: number;  // Add this back
   text: string;
   completed: boolean;
 }
@@ -44,26 +42,36 @@ export default function ApologySection() {
 
   const loadPromises = async () => {
     setLoading(true);
+    setSaveStatus('idle');
     try {
       console.log('🔍 Loading promises from Appwrite...');
       const data = await getPromises();
       console.log('📦 Data from Appwrite:', data);
       
       if (data && data.length > 0) {
-      const mapped = data.map((doc: any) => ({
-  $id: doc.$id,
-  id: doc.id,  // Keep the id
-  text: doc.text,
-  completed: doc.completed ?? true,
-}));
-
+        const mapped = data.map((doc: any) => ({
+          $id: doc.$id,
+          text: doc.text,
+          completed: doc.completed ?? true,
+        }));
         setPromises(mapped);
-        console.log('✅ Loaded', mapped.length, 'promises from Appwrite');
+        console.log(`✅ Loaded ${mapped.length} promises from Appwrite`);
       } else {
         console.log('📝 No promises in Appwrite, using defaults');
         setPromises(DEFAULT_PROMISES);
-        // Save defaults to Appwrite
-        await saveAllPromises(DEFAULT_PROMISES);
+        
+        // Try to save defaults to Appwrite
+        try {
+          for (const promise of DEFAULT_PROMISES) {
+            await createPromise({
+              text: promise.text,
+              completed: promise.completed,
+            });
+          }
+          console.log('✅ Default promises saved to Appwrite');
+        } catch (saveErr) {
+          console.log('📝 Could not save defaults to Appwrite');
+        }
       }
     } catch (err) {
       console.error('❌ Error loading promises:', err);
@@ -82,29 +90,22 @@ export default function ApologySection() {
       console.log('💾 Saving promises to Appwrite:', promisesToSave);
       
       let successCount = 0;
-      
-      // First, get existing promises
       const existing = await getPromises();
       
       for (const promise of promisesToSave) {
         try {
-          // Check if this promise already exists (by text)
           const existingDoc = existing.find((p: any) => p.text === promise.text);
           
           if (existingDoc && existingDoc.$id) {
-            // Update existing
             await updatePromise(existingDoc.$id, {
               text: promise.text,
               completed: promise.completed,
             });
-            console.log(`✅ Updated promise: "${promise.text}"`);
           } else {
-            // Create new
             await createPromise({
               text: promise.text,
               completed: promise.completed,
             });
-            console.log(`✅ Created promise: "${promise.text}"`);
           }
           successCount++;
         } catch (err) {
@@ -117,14 +118,14 @@ export default function ApologySection() {
         console.log(`✅ All ${successCount} promises saved to Appwrite!`);
       } else {
         setSaveStatus('error');
-        setErrorMessage(`Saved ${successCount}/${promisesToSave.length} promises. Check console for errors.`);
+        setErrorMessage(`Saved ${successCount}/${promisesToSave.length} promises.`);
       }
       
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
       console.error('❌ Error saving promises:', error);
       setSaveStatus('error');
-      setErrorMessage('Failed to save to Appwrite. Check console.');
+      setErrorMessage('Failed to save to Appwrite.');
       setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
@@ -140,6 +141,7 @@ export default function ApologySection() {
 
     setPromises(prev => [...prev, newPromise]);
     setNewPromiseText('');
+    setSaveStatus('saving');
     
     try {
       console.log('➕ Adding promise:', newPromise);
@@ -149,7 +151,6 @@ export default function ApologySection() {
       });
       console.log('✅ Promise added to Appwrite:', created);
       
-      // Update the promise with the $id from Appwrite
       if (created && created.$id) {
         setPromises(prev => prev.map(p => 
           p.text === newPromise.text ? { ...p, $id: created.$id } : p
@@ -176,10 +177,11 @@ export default function ApologySection() {
     e.stopPropagation();
     if (!editText.trim()) return;
 
+    setSaveStatus('saving');
     try {
       if (promise.$id) {
         await updatePromise(promise.$id, { text: editText });
-        console.log(`✅ Updated promise ${promise.$id} text`);
+        console.log(`✅ Updated promise ${promise.$id}`);
       }
       setPromises(prev => prev.map(p => p.$id === promise.$id ? { ...p, text: editText } : p));
       setEditingId(null);
@@ -187,9 +189,10 @@ export default function ApologySection() {
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('❌ Error updating promise:', error);
-      // Local fallback
       setPromises(prev => prev.map(p => p.$id === promise.$id ? { ...p, text: editText } : p));
       setEditingId(null);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
@@ -197,15 +200,19 @@ export default function ApologySection() {
     e.stopPropagation();
     if (!confirm('Are you sure you want to delete this commitment?')) return;
 
+    setSaveStatus('saving');
     try {
       if (promise.$id) {
         await deletePromise(promise.$id);
         console.log(`✅ Deleted promise ${promise.$id}`);
       }
+      setPromises(prev => prev.filter(p => p.$id !== promise.$id));
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('❌ Error deleting promise:', error);
-    } finally {
-      setPromises(prev => prev.filter(p => p.$id !== promise.$id));
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
@@ -216,16 +223,21 @@ export default function ApologySection() {
       p.$id === promise.$id ? { ...p, completed: !p.completed } : p
     );
     setPromises(updated);
+    setSaveStatus('saving');
     
     try {
       if (promise.$id) {
         await updatePromise(promise.$id, { completed: !promise.completed });
-        console.log(`✅ Toggled promise ${promise.$id} to ${!promise.completed}`);
+        console.log(`✅ Toggled promise ${promise.$id}`);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
       } else {
         await savePromises(updated);
       }
     } catch (error) {
       console.error('❌ Error toggling promise:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
@@ -249,7 +261,6 @@ export default function ApologySection() {
           <div className="apology-header">
             <div className="apology-date">Aaj iss bhaari dil se likhra hu</div>
           </div>
-          &nbsp;
 
           <div className="apology-content">
             <p className="apology-greeting">Meri Jaan 🎀,</p>
@@ -259,28 +270,24 @@ export default function ApologySection() {
               kabhi kabhi me tumhe bohot zyada gussa dila deta hu.. or me jaata hu tumhe isse bohot taqleef hoti h...
               par me aisa nhi hu mene kabhi bhi tumhe sachme hurt karna nhi chaha... 
             </p>
-            &nbsp;
+            
             <p>
               Tum bohot keemti ho mere liye... Tumhe me kabhi compare nhi kar sakta kisi bhi ladki se..
               Tum meri jaan ho Amna.. Tumhare alawa mera koi nhi.. na duniya me na akhirat me..
             </p>
-            &nbsp;
             
             <div className="apology-highlight">
               "Me galat tha, mene tumhe taqleef di.. uss galti ke liye SORRY JAAN"
             </div>
-            &nbsp;
 
             <p>
               Mujhe pata h tum mujhse bohot zyada pyaar karti ho.. or kabhi bhi me tumse durr rahu to yeh letter padh lena 
               toh tum mujhe feel kar paaogi.. chahe kitne bhi gusse me kuch bhi kaha rahu.. 
             </p>
-            &nbsp;
 
             <p>
               hum hamesha ek saath rahenge tumne kaha hona ke tumhe hamesha mere saath rehna h.. toh tumhara wada hum milke nibhayege..🥰
             </p>
-            &nbsp;
 
             <p className="apology-closing">Tumhari Jaan,</p>
             

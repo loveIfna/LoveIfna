@@ -1,7 +1,7 @@
 // app/components/PrivateFolder.tsx
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   getEncryptedPrivateLetters,
   createEncryptedPrivateLetter,
@@ -32,7 +32,7 @@ export interface PrivatePhoto {
   caption: string;
   author: 'Lateef' | 'Amna';
   date: string;
-  url: string; // local blob: URL of the DECRYPTED image, not the raw storage URL
+  url: string;
   likes: number;
   fileId?: string;
 }
@@ -49,9 +49,9 @@ export default function PrivateFolder() {
   const [letters, setLetters] = useState<PrivateLetter[]>([]);
   const [photos, setPhotos] = useState<PrivatePhoto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [decryptingPhotos, setDecryptingPhotos] = useState<Record<string, boolean>>({});
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
 
-  // Tracks every blob: URL we've created for decrypted photos so we can
-  // revoke them (avoid memory leaks) whenever we reload data or unmount.
   const objectUrlsRef = useRef<string[]>([]);
 
   // Modals
@@ -76,19 +76,10 @@ export default function PrivateFolder() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // No auto-unlock-on-reload: the encryption key only ever lives in memory
-  // (encryptionService), never persisted, so it cannot survive a page
-  // reload. Requiring the passcode again each time is a feature of a real
-  // zero-knowledge design, not a bug — if we skipped this step we'd have to
-  // store the key or password somewhere, which would break the "password
-  // is never stored" guarantee.
-
-  // Clean up any decrypted-photo blob URLs when the component unmounts.
   useEffect(() => {
     return () => {
       revokeAllObjectUrls();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const revokeAllObjectUrls = () => {
@@ -96,6 +87,32 @@ export default function PrivateFolder() {
       URL.revokeObjectURL(url);
     }
     objectUrlsRef.current = [];
+  };
+
+  const decryptSinglePhoto = async (fileId: string) => {
+    if (!fileId) return;
+    if (photoUrls[fileId]) return;
+    if (decryptingPhotos[fileId]) return;
+
+    setDecryptingPhotos(prev => ({ ...prev, [fileId]: true }));
+
+    try {
+      console.log(`🔓 Decrypting photo: ${fileId}`);
+      const result = await downloadEncryptedFile(fileId);
+      
+      const blob = new Blob([result.data], { 
+        type: result.mimeType || 'image/jpeg' 
+      });
+      const url = URL.createObjectURL(blob);
+      objectUrlsRef.current.push(url);
+      
+      setPhotoUrls(prev => ({ ...prev, [fileId]: url }));
+      console.log(`✅ Photo decrypted: ${fileId}`);
+    } catch (err) {
+      console.error(`❌ Failed to decrypt photo ${fileId}:`, err);
+    } finally {
+      setDecryptingPhotos(prev => ({ ...prev, [fileId]: false }));
+    }
   };
 
   const loadVaultData = async () => {
@@ -115,41 +132,40 @@ export default function PrivateFolder() {
         content: doc.content || doc.text || '',
       }));
 
-      // Photos: title/caption are already decrypted by getEncryptedPrivatePhotos.
-      // The image bytes themselves are still encrypted in storage, so we
-      // download + decrypt each one here and turn it into a local blob: URL
-      // for display. Old object URLs are revoked first to avoid leaking memory.
+      // Revoke old object URLs and reset photo URLs
       revokeAllObjectUrls();
+      setPhotoUrls({});
+      setDecryptingPhotos({});
 
-      const mappedPhotos: PrivatePhoto[] = await Promise.all(
-        (photosData as any[]).map(async (doc) => {
-          let displayUrl = '';
-          if (doc.fileId) {
-            try {
-              const result = await downloadEncryptedFile(doc.fileId);
-              const blob = new Blob([result.data], { type: result.mimeType || 'image/jpeg' });
-              displayUrl = URL.createObjectURL(blob);
-              objectUrlsRef.current.push(displayUrl);
-            } catch (decryptErr) {
-              console.error(`⚠️ Failed to decrypt photo ${doc.$id}:`, decryptErr);
-            }
-          }
-
-          return {
-            $id: doc.$id,
-            title: doc.title || doc.name || 'Memory Photo',
-            caption: doc.caption || '',
-            author: (doc.author === 'Amna' ? 'Amna' : 'Lateef') as 'Lateef' | 'Amna',
-            date: doc.date || new Date(doc.$createdAt).toISOString().split('T')[0],
-            url: displayUrl,
-            likes: doc.likes || 0,
-            fileId: doc.fileId || '',
-          };
-        })
-      );
+      const mappedPhotos: PrivatePhoto[] = (photosData as any[]).map((doc) => {
+        // Check if photo already has a URL from previous load
+        const existingUrl = photoUrls[doc.fileId] || '';
+        
+        return {
+          $id: doc.$id,
+          title: doc.title || doc.name || 'Memory Photo',
+          caption: doc.caption || '',
+          author: (doc.author === 'Amna' ? 'Amna' : 'Lateef') as 'Lateef' | 'Amna',
+          date: doc.date || new Date(doc.$createdAt).toISOString().split('T')[0],
+          url: existingUrl,
+          likes: doc.likes || 0,
+          fileId: doc.fileId || '',
+        };
+      });
 
       setLetters(mappedLetters);
       setPhotos(mappedPhotos);
+
+      // Auto-decrypt photos if in photos tab
+      if (activeTab === 'photos') {
+        for (const photo of mappedPhotos) {
+          if (photo.fileId && !photoUrls[photo.fileId]) {
+            await decryptSinglePhoto(photo.fileId);
+          }
+        }
+      }
+
+      console.log(`✅ Loaded ${mappedLetters.length} letters and ${mappedPhotos.length} photos`);
     } catch (error) {
       console.error('Error loading vault data:', error);
     } finally {
@@ -157,8 +173,18 @@ export default function PrivateFolder() {
     }
   };
 
-  // PIN Verification — the passcode is checked server-side, then reused
-  // client-side (never sent anywhere else) to derive the AES encryption key.
+  // Decrypt photos when switching to photos tab
+  useEffect(() => {
+    if (activeTab === 'photos' && isAuthenticated && photos.length > 0) {
+      for (const photo of photos) {
+        if (photo.fileId && !photoUrls[photo.fileId]) {
+          decryptSinglePhoto(photo.fileId);
+        }
+      }
+    }
+  }, [activeTab, photos, photoUrls]);
+
+  // PIN Verification
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -193,6 +219,8 @@ export default function PrivateFolder() {
   const handleLockVault = () => {
     encryptionService.clearSensitiveData();
     revokeAllObjectUrls();
+    setPhotoUrls({});
+    setDecryptingPhotos({});
     setLetters([]);
     setPhotos([]);
     setIsAuthenticated(false);
@@ -308,7 +336,6 @@ export default function PrivateFolder() {
     try {
       let fileId = editingPhoto?.fileId || '';
 
-      // Only re-upload/re-encrypt the file if the user picked a new one.
       if (photoFile) {
         const uploaded = await uploadEncryptedFile(photoFile);
         fileId = uploaded.$id;
@@ -356,9 +383,6 @@ export default function PrivateFolder() {
   const handleLikePhoto = async (photoId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      // Likes aren't sensitive content, so this stays on the plain
-      // (non-encrypting) update path — no need to re-encrypt title/caption
-      // just to bump a number.
       await likePrivatePhoto(photoId);
       await loadVaultData();
     } catch (error) {
@@ -409,219 +433,250 @@ export default function PrivateFolder() {
   return (
     <>
       <div className="private-folder-content" style={{ marginTop: '1.5rem' }}>
-      {/* Header Bar with Card Design */}
-      <div className="folder-top-bar">
-        <div className="folder-title-area">
-          <h2>🤭 Private Vault</h2>
-          <p>Read, write, edit & manage confidential notes, letters, and couple photos.</p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <div className="folder-tabs">
-            <button
-              className={`tab-btn ${activeTab === 'letters' ? 'active' : ''}`}
-              onClick={() => setActiveTab('letters')}
-            >
-              💌 Letters ({letters.length})
-            </button>
-            <button
-              className={`tab-btn ${activeTab === 'photos' ? 'active' : ''}`}
-              onClick={() => setActiveTab('photos')}
-            >
-              📸 Photos ({photos.length})
-            </button>
+        <div className="folder-top-bar">
+          <div className="folder-title-area">
+            <h2>🤭 Private Vault</h2>
+            <p>Read, write, edit & manage confidential notes, letters, and couple photos.</p>
           </div>
 
-          {activeTab === 'letters' ? (
-            <button className="action-trigger-btn" onClick={openCreateLetterModal}>
-              ✏️ Write Letter
-            </button>
-          ) : (
-            <button className="action-trigger-btn" onClick={openCreatePhotoModal}>
-              📷 Post Photo
-            </button>
-          )}
-
-          <button className="action-trigger-btn" onClick={handleLockVault} title="Lock Vault">
-            🔒 Lock
-          </button>
-        </div>
-      </div>
-
-      {loading && (
-        <div className="skeleton-grid" style={{ marginTop: '1.5rem' }}>
-          <div className="skeleton-card">
-            <div className="skeleton-box skeleton-title" />
-            <div className="skeleton-box skeleton-text" />
-            <div className="skeleton-box skeleton-text-short" />
-          </div>
-          <div className="skeleton-card">
-            <div className="skeleton-box skeleton-title" />
-            <div className="skeleton-box skeleton-text" />
-            <div className="skeleton-box skeleton-text-short" />
-          </div>
-          <div className="skeleton-card">
-            <div className="skeleton-box skeleton-title" />
-            <div className="skeleton-box skeleton-text" />
-            <div className="skeleton-box skeleton-text-short" />
-          </div>
-        </div>
-      )}
-
-      {/* LETTERS SECTION - Enhanced Cards */}
-      {activeTab === 'letters' && !loading && (
-        <div className="letters-vault-grid">
-          {letters.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">📭</div>
-              <h4>No letters in vault yet</h4>
-              <p>Click "Write Letter" above to post your first private note.</p>
-            </div>
-          ) : (
-            letters.map((letter) => (
-              <div
-                key={letter.$id}
-                className="letter-vault-card"
-                onClick={() => setSelectedLetter(letter)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <div className="folder-tabs">
+              <button
+                className={`tab-btn ${activeTab === 'letters' ? 'active' : ''}`}
+                onClick={() => setActiveTab('letters')}
               >
-                {/* Card Header with Author Badge */}
-                <div className="letter-card-header">
-                  <span className={`letter-card-author ${letter.author === 'Amna' ? 'amna' : 'lateef'}`}>
-                    {letter.author === 'Amna' ? '🌸 Amna' : '💙 Lateef'}
-                  </span>
-                  <span className="letter-card-date">{letter.date}</span>
-                </div>
+                💌 Letters ({letters.length})
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'photos' ? 'active' : ''}`}
+                onClick={() => setActiveTab('photos')}
+              >
+                📸 Photos ({photos.length})
+              </button>
+            </div>
 
-                {/* Card Body */}
-                <div className="letter-card-body">
-                  <h3 className="letter-card-title">{letter.title}</h3>
-                  <div className="letter-card-category">
-                    <span className="category-tag">{letter.category}</span>
-                  </div>
-                  <p className="letter-card-preview">{letter.content}</p>
-                </div>
+            {activeTab === 'letters' ? (
+              <button className="action-trigger-btn" onClick={openCreateLetterModal}>
+                ✏️ Write Letter
+              </button>
+            ) : (
+              <button className="action-trigger-btn" onClick={openCreatePhotoModal}>
+                📷 Post Photo
+              </button>
+            )}
 
-                {/* Card Footer with Actions */}
-                <div className="letter-card-footer">
-                  <span className="letter-card-read">📖 Read More</span>
+            <button className="action-trigger-btn" onClick={handleLockVault} title="Lock Vault">
+              🔒 Lock
+            </button>
+          </div>
+        </div>
 
-                  <div className="card-actions" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      className="action-icon-btn edit"
-                      title="Edit Letter"
-                      onClick={(e) => openEditLetterModal(letter, e)}
-                    >
-                      ✏️
-                    </button>
-                    {confirmDeleteId === letter.$id ? (
-                      <div className="confirm-delete-box">
-                        <span>Delete?</span>
-                        <button className="confirm-yes" onClick={(e) => handleDeleteLetter(letter.$id, e)}>Yes</button>
-                        <button className="confirm-no" onClick={() => setConfirmDeleteId(null)}>No</button>
-                      </div>
-                    ) : (
-                      <button
-                        className="action-icon-btn delete"
-                        title="Delete Letter"
-                        onClick={() => setConfirmDeleteId(letter.$id)}
-                      >
-                        🗑️
-                      </button>
-                    )}
-                  </div>
-                </div>
+        {loading && (
+          <div className="skeleton-grid" style={{ marginTop: '1.5rem' }}>
+            <div className="skeleton-card">
+              <div className="skeleton-box skeleton-title" />
+              <div className="skeleton-box skeleton-text" />
+              <div className="skeleton-box skeleton-text-short" />
+            </div>
+            <div className="skeleton-card">
+              <div className="skeleton-box skeleton-title" />
+              <div className="skeleton-box skeleton-text" />
+              <div className="skeleton-box skeleton-text-short" />
+            </div>
+            <div className="skeleton-card">
+              <div className="skeleton-box skeleton-title" />
+              <div className="skeleton-box skeleton-text" />
+              <div className="skeleton-box skeleton-text-short" />
+            </div>
+          </div>
+        )}
+
+        {/* LETTERS SECTION */}
+        {activeTab === 'letters' && !loading && (
+          <div className="letters-vault-grid">
+            {letters.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">📭</div>
+                <h4>No letters in vault yet</h4>
+                <p>Click "Write Letter" above to post your first private note.</p>
               </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* PHOTOS SECTION - Enhanced Cards */}
-      {activeTab === 'photos' && !loading && (
-        <div className="photos-vault-grid">
-          {photos.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">❤️</div>
-              <h4>Jaan photos daalo na</h4>
-              <p>Click "Post Photo" above to upload.</p>
-            </div>
-          ) : (
-            photos.map((photo) => (
-              <div
-                key={photo.$id}
-                className="photo-vault-card"
-                onClick={() => setSelectedPhoto(photo)}
-              >
-                {/* Photo Image */}
-                <div className="photo-wrapper">
-                  <img
-                    src={photo.url}
-                    alt={photo.title}
-                    className="photo-img"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23f4ece7"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" font-size="30"%3E📸%3C/text%3E%3C/svg%3E';
-                    }}
-                  />
-                  <div className="photo-overlay">
-                    <span className="zoom-badge">🔍 View Full Photo</span>
+            ) : (
+              letters.map((letter) => (
+                <div
+                  key={letter.$id}
+                  className="letter-vault-card"
+                  onClick={() => setSelectedLetter(letter)}
+                >
+                  <div className="letter-card-header">
+                    <span className={`letter-card-author ${letter.author === 'Amna' ? 'amna' : 'lateef'}`}>
+                      {letter.author === 'Amna' ? '🌸 Amna' : '💙 Lateef'}
+                    </span>
+                    <span className="letter-card-date">{letter.date}</span>
                   </div>
-                  <div className="photo-author-badge">
-                    {photo.author === 'Amna' ? '🌸' : '💙'}
-                  </div>
-                </div>
 
-                {/* Photo Info */}
-                <div className="photo-info">
-                  <div className="photo-header">
-                    <h4 className="photo-title">{photo.title}</h4>
-                    <div className="photo-actions" onClick={(e) => e.stopPropagation()}>
+                  <div className="letter-card-body">
+                    <h3 className="letter-card-title">{letter.title}</h3>
+                    <div className="letter-card-category">
+                      <span className="category-tag">{letter.category}</span>
+                    </div>
+                    <p className="letter-card-preview">{letter.content}</p>
+                  </div>
+
+                  <div className="letter-card-footer">
+                    <span className="letter-card-read">📖 Read More</span>
+                    <div className="card-actions" onClick={(e) => e.stopPropagation()}>
                       <button
                         className="action-icon-btn edit"
-                        title="Edit Photo"
-                        onClick={(e) => openEditPhotoModal(photo, e)}
+                        title="Edit Letter"
+                        onClick={(e) => openEditLetterModal(letter, e)}
                       >
                         ✏️
                       </button>
-                      {confirmDeleteId === photo.$id ? (
+                      {confirmDeleteId === letter.$id ? (
                         <div className="confirm-delete-box">
                           <span>Delete?</span>
-                          <button className="confirm-yes" onClick={(e) => handleDeletePhoto(photo.$id, e)}>Yes</button>
+                          <button className="confirm-yes" onClick={(e) => handleDeleteLetter(letter.$id, e)}>Yes</button>
                           <button className="confirm-no" onClick={() => setConfirmDeleteId(null)}>No</button>
                         </div>
                       ) : (
                         <button
                           className="action-icon-btn delete"
-                          title="Delete Photo"
-                          onClick={() => setConfirmDeleteId(photo.$id)}
+                          title="Delete Letter"
+                          onClick={() => setConfirmDeleteId(letter.$id)}
                         >
                           🗑️
                         </button>
                       )}
                     </div>
                   </div>
-
-                  <p className="photo-caption">{photo.caption}</p>
-
-                  <div className="photo-meta">
-                    <span className="photo-meta-author">By {photo.author} • {photo.date}</span>
-                    <button
-                      className="like-btn"
-                      onClick={(e) => handleLikePhoto(photo.$id, e)}
-                    >
-                      <span className="like-heart">❤️</span> {photo.likes}
-                    </button>
-                  </div>
                 </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* PHOTOS SECTION - Fixed */}
+        {activeTab === 'photos' && !loading && (
+          <div className="photos-vault-grid">
+            {photos.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">❤️</div>
+                <h4>No photos in vault yet</h4>
+                <p>Click "Post Photo" above to upload.</p>
               </div>
-            ))
-          )}
-        </div>
-      )}
+            ) : (
+              photos.map((photo) => {
+                const isDecrypting = decryptingPhotos[photo.fileId || ''];
+                const imageUrl = photoUrls[photo.fileId || ''] || '';
+
+                return (
+                  <div
+                    key={photo.$id}
+                    className="photo-vault-card"
+                    onClick={() => {
+                      if (imageUrl) {
+                        setSelectedPhoto({ ...photo, url: imageUrl });
+                      }
+                    }}
+                  >
+                    <div className="photo-wrapper">
+                      {isDecrypting ? (
+                        <div style={{ 
+                          height: '200px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          background: '#f5f0ed',
+                          color: 'var(--text-light)',
+                          fontSize: '0.9rem'
+                        }}>
+                          <span>🔓 Decrypting...</span>
+                        </div>
+                      ) : imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={photo.title}
+                          className="photo-img"
+                          onError={(e) => {
+                            console.error('Image failed to load:', imageUrl);
+                            (e.target as HTMLImageElement).src =
+                              'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23f4ece7"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" font-size="30"%3E📸%3C/text%3E%3C/svg%3E';
+                          }}
+                        />
+                      ) : (
+                        <div style={{ 
+                          height: '200px', 
+                          display: 'flex', 
+                          flexDirection: 'column',
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          background: '#f5f0ed',
+                          color: 'var(--text-light)',
+                          fontSize: '0.9rem',
+                          gap: '0.5rem'
+                        }}>
+                          <span>🔒 Encrypted</span>
+                          <span style={{ fontSize: '0.7rem' }}>Click to decrypt</span>
+                        </div>
+                      )}
+                      <div className="photo-overlay">
+                        <span className="zoom-badge">🔍 View Full Photo</span>
+                      </div>
+                      <div className="photo-author-badge">
+                        {photo.author === 'Amna' ? '🌸' : '💙'}
+                      </div>
+                    </div>
+
+                    <div className="photo-info">
+                      <div className="photo-header">
+                        <h4 className="photo-title">{photo.title}</h4>
+                        <div className="photo-actions" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className="action-icon-btn edit"
+                            title="Edit Photo"
+                            onClick={(e) => openEditPhotoModal(photo, e)}
+                          >
+                            ✏️
+                          </button>
+                          {confirmDeleteId === photo.$id ? (
+                            <div className="confirm-delete-box">
+                              <span>Delete?</span>
+                              <button className="confirm-yes" onClick={(e) => handleDeletePhoto(photo.$id, e)}>Yes</button>
+                              <button className="confirm-no" onClick={() => setConfirmDeleteId(null)}>No</button>
+                            </div>
+                          ) : (
+                            <button
+                              className="action-icon-btn delete"
+                              title="Delete Photo"
+                              onClick={() => setConfirmDeleteId(photo.$id)}
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="photo-caption">{photo.caption}</p>
+
+                      <div className="photo-meta">
+                        <span className="photo-meta-author">By {photo.author} • {photo.date}</span>
+                        <button
+                          className="like-btn"
+                          onClick={(e) => handleLikePhoto(photo.$id, e)}
+                        >
+                          <span className="like-heart">❤️</span> {photo.likes}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ===== MODALS WITH ENHANCED UI ===== */}
-
+      {/* MODALS - Keep the same as before */}
       {/* CREATE / EDIT LETTER MODAL */}
       {showWriteLetterModal && (
         <div className="modal-backdrop" onClick={(e) => {

@@ -24,6 +24,8 @@ export default function MemoriesGallery() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Form Fields
   const [title, setTitle] = useState('');
@@ -39,20 +41,34 @@ export default function MemoriesGallery() {
 
   const loadMemories = async () => {
     setLoading(true);
+    setSaveStatus('idle');
     try {
+      console.log('🔍 Loading memories from Appwrite...');
       const data = await getMemories();
-      const mapped = (data as any[]).map((doc) => ({
-        $id: doc.$id || 'id-' + Date.now(),
-        title: doc.title || doc.name || 'Untitled Memory',
-        description: doc.description || doc.content || '',
-        emoji: doc.emoji || '🌟',
-        date: doc.date || new Date(doc.$createdAt).toLocaleDateString(),
-      }));
-      setMemories(mapped.length > 0 ? mapped : DEFAULT_MEMORIES);
-      setSelectedMemory(mapped.length > 0 ? mapped[0] : DEFAULT_MEMORIES[0]);
+      console.log('📦 Data from Appwrite:', data);
+      
+      if (data && data.length > 0) {
+        const mapped = (data as any[]).map((doc) => ({
+          $id: doc.$id,
+          title: doc.title || doc.name || 'Untitled Memory',
+          description: doc.description || doc.content || '',
+          emoji: doc.emoji || '🌟',
+          date: doc.date || new Date(doc.$createdAt).toLocaleDateString(),
+        }));
+        setMemories(mapped);
+        setSelectedMemory(mapped[0] || null);
+        console.log(`✅ Loaded ${mapped.length} memories from Appwrite`);
+      } else {
+        console.log('📝 No memories in Appwrite, using defaults');
+        // ✅ Only show defaults, don't auto-save to Appwrite
+        setMemories(DEFAULT_MEMORIES);
+        setSelectedMemory(DEFAULT_MEMORIES[0]);
+      }
     } catch (error) {
+      console.error('❌ Error loading memories:', error);
       setMemories(DEFAULT_MEMORIES);
       setSelectedMemory(DEFAULT_MEMORIES[0]);
+      setErrorMessage('Failed to load from Appwrite. Using local data.');
     } finally {
       setLoading(false);
     }
@@ -64,6 +80,7 @@ export default function MemoriesGallery() {
     setDescription('');
     setEmoji('🌟');
     setShowForm(true);
+    setErrorMessage('');
   };
 
   const handleEditClick = (memory: Memory, e?: React.MouseEvent) => {
@@ -73,22 +90,29 @@ export default function MemoriesGallery() {
     setDescription(memory.description);
     setEmoji(memory.emoji);
     setShowForm(true);
+    setErrorMessage('');
   };
 
   const handleDeleteClick = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (confirm('Are you sure you want to delete this memory?')) {
-      try {
-        if (!id.startsWith('default-')) {
-          await deleteMemory(id);
-        }
-      } catch (err) {
-        console.log('Delete memory notice:', err);
-      } finally {
-        const remaining = memories.filter(m => m.$id !== id);
-        setMemories(remaining);
-        setSelectedMemory(remaining.length > 0 ? remaining[0] : null);
+    if (!confirm('Are you sure you want to delete this memory?')) return;
+    
+    setSaveStatus('saving');
+    try {
+      if (!id.startsWith('default-') && !id.startsWith('mem-')) {
+        await deleteMemory(id);
+        console.log(`✅ Deleted memory: ${id}`);
       }
+      const remaining = memories.filter(m => m.$id !== id);
+      setMemories(remaining);
+      setSelectedMemory(remaining.length > 0 ? remaining[0] : null);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err) {
+      console.error('❌ Delete memory error:', err);
+      setSaveStatus('error');
+      setErrorMessage('Failed to delete memory.');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
@@ -99,11 +123,18 @@ export default function MemoriesGallery() {
       return;
     }
 
+    setSaveStatus('saving');
+    setErrorMessage('');
+
     try {
-      if (editingId && !editingId.startsWith('default-')) {
+      if (editingId && !editingId.startsWith('default-') && !editingId.startsWith('mem-')) {
+        // Update existing
         await updateMemory(editingId, { title, description, emoji });
+        console.log(`✅ Updated memory: ${editingId}`);
       } else {
-        await createMemory({ title, description, emoji });
+        // Create new
+        const newMemory = await createMemory({ title, description, emoji });
+        console.log(`✅ Created memory: ${newMemory.$id}`);
       }
       
       setTitle('');
@@ -111,9 +142,16 @@ export default function MemoriesGallery() {
       setEmoji('🌟');
       setShowForm(false);
       setEditingId(null);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
       await loadMemories();
     } catch (error) {
-      // Fallback local update if Appwrite is not configured
+      console.error('❌ Error saving memory:', error);
+      setSaveStatus('error');
+      setErrorMessage('Failed to save memory. Please try again.');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+      
+      // Fallback local update
       const updated: Memory = {
         $id: editingId || 'mem-' + Date.now(),
         title,
@@ -147,6 +185,23 @@ export default function MemoriesGallery() {
           ✨ Add Memory
         </button>
       </div>
+
+      {/* Save Status */}
+      {saveStatus === 'saving' && (
+        <div style={{ textAlign: 'center', padding: '0.5rem', color: 'var(--text-muted)' }}>
+          ⏳ Saving to Appwrite...
+        </div>
+      )}
+      {saveStatus === 'saved' && (
+        <div style={{ textAlign: 'center', padding: '0.5rem', color: '#4CAF50' }}>
+          ✅ Saved to Appwrite successfully!
+        </div>
+      )}
+      {saveStatus === 'error' && (
+        <div style={{ textAlign: 'center', padding: '0.5rem', color: '#C62828' }}>
+          ❌ {errorMessage || 'Failed to save to Appwrite'}
+        </div>
+      )}
 
       {/* Form Modal */}
       {showForm && (
@@ -198,8 +253,8 @@ export default function MemoriesGallery() {
                 />
               </div>
 
-              <button type="submit" className="submit-btn">
-                {editingId ? '💾 Save Changes' : '💾 Save Memory'}
+              <button type="submit" className="submit-btn" disabled={saveStatus === 'saving'}>
+                {saveStatus === 'saving' ? 'Saving...' : editingId ? '💾 Save Changes' : '💾 Save Memory'}
               </button>
             </form>
           </div>
@@ -233,7 +288,7 @@ export default function MemoriesGallery() {
         </div>
       ) : (
         <>
-          {/* Selected Memory Detail - Enhanced */}
+          {/* Selected Memory Detail */}
           {selectedMemory && (
             <div className="memory-detail-card">
               <div className="memory-detail-emoji">{selectedMemory.emoji}</div>
@@ -254,7 +309,7 @@ export default function MemoriesGallery() {
             </div>
           )}
           
-          {/* Memories Grid - Enhanced Cards */}
+          {/* Memories Grid */}
           <div className="memories-grid">
             {memories.map(memory => (
               <div 
